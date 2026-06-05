@@ -26,6 +26,9 @@ $job = vbf_job_create($date, $color, $boxes, $names);
 // Detach the worker so the HTTP request returns immediately.
 // Use php CLI; PHP_BINARY under php-fpm points to the fpm binary, so prefer /usr/bin/php.
 $php    = is_executable('/usr/bin/php') ? '/usr/bin/php' : PHP_BINARY;
+// Every interpolated component below is escapeshellarg()'d. The job id is additionally
+// constrained to /^[0-9A-Za-z-]+$/ by vbf_job_create, so $jobId and the $log path built
+// from it contain no shell metacharacters. The bare >, 2>&1, & are intentional shell syntax.
 $worker = escapeshellarg(__DIR__ . '/../worker.php');
 $jobId  = escapeshellarg($job['id']);
 $log    = escapeshellarg(vbf_jobs_dir() . '/' . $job['id'] . '.log');

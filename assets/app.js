@@ -1,6 +1,12 @@
 'use strict';
 
 const $ = (sel) => document.querySelector(sel);
+
+// Escape untrusted strings (upstream API fields) before injecting into innerHTML.
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, (c) =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
 const state = {
   records: [],          // from list.php
   current: null,        // {filename, view_url}
@@ -37,13 +43,13 @@ function renderList() {
     if (files.length === 0) continue;
     const div = document.createElement('div');
     div.className = 'take';
-    div.innerHTML = `<h4>#${rec.id} — ${rec.glos || rec.m_transcription || ''}</h4>`;
+    div.innerHTML = `<h4>#${esc(rec.id)} — ${esc(rec.glos || rec.m_transcription || '')}</h4>`;
     for (const f of files) {
       const row = document.createElement('div');
       row.className = 'file';
       const fixed = f.already_fixed ? '<span class="badge fixed">fixed</span>' : '';
-      row.innerHTML = `<span class="badge">${f.camera}</span>
-        <span>${f.filename}</span> ${fixed}`;
+      row.innerHTML = `<span class="badge">${esc(f.camera)}</span>
+        <span>${esc(f.filename)}</span> ${fixed}`;
       const btn = document.createElement('button');
       btn.textContent = 'Edit';
       btn.onclick = () => openEditor(f);
@@ -180,10 +186,10 @@ function renderBatch() {
       if (!f.local || (cam && f.camera !== cam)) continue;
       const row = document.createElement('label');
       row.className = 'batch-row';
-      row.innerHTML = `<input type="checkbox" value="${f.filename}">
-        <span class="badge">${f.camera}</span> ${f.filename}
+      row.innerHTML = `<input type="checkbox" value="${esc(f.filename)}">
+        <span class="badge">${esc(f.camera)}</span> ${esc(f.filename)}
         ${f.already_fixed ? '<span class="badge fixed">fixed</span>' : ''}
-        <span class="pstat" data-file="${f.filename}"></span>`;
+        <span class="pstat" data-file="${esc(f.filename)}"></span>`;
       wrap.appendChild(row);
     }
   }
