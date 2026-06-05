@@ -231,6 +231,22 @@ async function pollStatus(jobId) {
   else { msg(`Batch complete: ${data.counts.done} done, ${data.counts.error} error`); }
 }
 
+// ---- Date dropdown ----
+async function loadDates() {
+  const sel = $('#date');
+  try {
+    const res = await fetch('api/dates.php');
+    const data = await res.json();
+    const dates = data.dates || [];
+    if (dates.length === 0) { sel.innerHTML = '<option value="">No dates available</option>'; return; }
+    sel.innerHTML = dates.map(d => `<option value="${esc(d)}">${esc(d)}</option>`).join('');
+    msg(`${dates.length} dates available`);
+  } catch (e) {
+    sel.innerHTML = '<option value="">Failed to load dates</option>';
+    msg('Could not load date list');
+  }
+}
+
 // ---- Wire up ----
 $('#load').onclick = loadDate;
 $('#camera').onchange = () => { renderList(); renderBatch(); };
@@ -240,3 +256,6 @@ $('#preview-frame').onclick = previewFrame;
 $('#preview-video').onclick = previewVideo;
 $('#select-cam').onclick = () => document.querySelectorAll('#batch-list input').forEach(c => c.checked = true);
 $('#run-batch').onclick = runBatch;
+
+// Populate the date dropdown on startup.
+loadDates();
