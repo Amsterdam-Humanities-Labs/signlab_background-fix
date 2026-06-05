@@ -1,0 +1,27 @@
+* { box-sizing: border-box; }
+body { font-family: system-ui, sans-serif; margin: 0; color: #1a1a1a; }
+header { padding: 12px 16px; background: #0b1f3a; color: #fff; position: sticky; top: 0; z-index: 10; }
+header h1 { margin: 0 0 8px; font-size: 18px; }
+.toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.toolbar input, .toolbar select, button { padding: 6px 10px; font-size: 14px; }
+button { cursor: pointer; border: 1px solid #2b4a7a; background: #1d3a6b; color: #fff; border-radius: 4px; }
+button:hover { background: #2b4a7a; }
+main { display: grid; grid-template-columns: 320px 1fr; gap: 16px; padding: 16px; }
+#edit-pane, #batch-pane { grid-column: 1 / -1; }
+#list { display: flex; flex-direction: column; gap: 4px; max-height: 70vh; overflow:auto; }
+.take { border: 1px solid #ddd; border-radius: 4px; padding: 6px 8px; }
+.take h4 { margin: 0 0 4px; font-size: 13px; }
+.file { display: flex; gap: 6px; align-items: center; font-size: 12px; padding: 2px 0; }
+.file button { padding: 2px 6px; font-size: 11px; }
+.badge { font-size: 10px; padding: 1px 5px; border-radius: 8px; background: #e0e0e0; }
+.badge.fixed { background: #b8e0c2; }
+.stage { position: relative; display: inline-block; max-width: 100%; }
+#video { max-width: 100%; display: block; }
+#canvas { position: absolute; left: 0; top: 0; cursor: crosshair; }
+.batch-controls { display: flex; gap: 8px; margin-bottom: 8px; }
+#batch-list { display: flex; flex-direction: column; gap: 2px; max-height: 50vh; overflow: auto; }
+.batch-row { display: flex; gap: 8px; align-items: center; font-size: 13px; }
+.pstat { font-size: 12px; }
+.pstat.done { color: #1a7f37; } .pstat.error { color: #b00; } .pstat.processing { color: #b36b00; }
+#preview-out img, #preview-out video { max-width: 100%; border: 2px solid #0b1f3a; margin-top: 8px; }
+.row-actions { margin-top: 8px; display: flex; gap: 8px; }

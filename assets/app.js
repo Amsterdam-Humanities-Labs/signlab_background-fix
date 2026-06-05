@@ -1,0 +1,236 @@
+'use strict';
+
+const $ = (sel) => document.querySelector(sel);
+const state = {
+  records: [],          // from list.php
+  current: null,        // {filename, view_url}
+  boxes: [],            // normalized {x,y,w,h}
+  drawing: null,        // in-progress box (display px)
+  frameApproved: false,
+  videoApproved: false,
+};
+
+function msg(text) { $('#status-msg').textContent = text; }
+
+// ---- Listing ----
+async function loadDate() {
+  const date = $('#date').value.trim();
+  if (!/^\d{8}$/.test(date)) { msg('Date must be YYYYMMDD'); return; }
+  msg('Loading…');
+  const res = await fetch(`api/list.php?date=${date}`);
+  const data = await res.json();
+  if (data.error) { msg('Error: ' + data.error); return; }
+  state.records = data.records;
+  renderList();
+  renderBatch();
+  msg(`${data.records.length} takes`);
+}
+
+function camFilter() { return $('#camera').value; }
+
+function renderList() {
+  const cam = camFilter();
+  const wrap = $('#list');
+  wrap.innerHTML = '';
+  for (const rec of state.records) {
+    const files = (rec.files || []).filter(f => f.local && (!cam || f.camera === cam));
+    if (files.length === 0) continue;
+    const div = document.createElement('div');
+    div.className = 'take';
+    div.innerHTML = `<h4>#${rec.id} — ${rec.glos || rec.m_transcription || ''}</h4>`;
+    for (const f of files) {
+      const row = document.createElement('div');
+      row.className = 'file';
+      const fixed = f.already_fixed ? '<span class="badge fixed">fixed</span>' : '';
+      row.innerHTML = `<span class="badge">${f.camera}</span>
+        <span>${f.filename}</span> ${fixed}`;
+      const btn = document.createElement('button');
+      btn.textContent = 'Edit';
+      btn.onclick = () => openEditor(f);
+      row.appendChild(btn);
+      div.appendChild(row);
+    }
+    wrap.appendChild(div);
+  }
+}
+
+// ---- Editor ----
+function openEditor(f) {
+  state.current = f;
+  state.boxes = [];
+  state.frameApproved = false;
+  state.videoApproved = false;
+  $('#edit-pane').hidden = false;
+  $('#edit-name').textContent = f.filename;
+  $('#preview-out').innerHTML = '';
+  const v = $('#video');
+  v.src = f.view_url;
+  v.onloadedmetadata = sizeCanvas;
+  $('#edit-pane').scrollIntoView({ behavior: 'smooth' });
+  updateBoxCount();
+}
+
+function sizeCanvas() {
+  const v = $('#video'), c = $('#canvas');
+  c.width = v.clientWidth;
+  c.height = v.clientHeight;
+  redraw();
+}
+window.addEventListener('resize', () => { if (!$('#edit-pane').hidden) sizeCanvas(); });
+
+function redraw() {
+  const c = $('#canvas'), ctx = c.getContext('2d');
+  ctx.clearRect(0, 0, c.width, c.height);
+  const color = $('#color').value;
+  const drawBox = (b) => {
+    ctx.fillStyle = color + 'cc';
+    ctx.strokeStyle = '#fff';
+    ctx.fillRect(b.x * c.width, b.y * c.height, b.w * c.width, b.h * c.height);
+    ctx.strokeRect(b.x * c.width, b.y * c.height, b.w * c.width, b.h * c.height);
+  };
+  state.boxes.forEach(drawBox);
+  if (state.drawing) {
+    const d = state.drawing;
+    ctx.fillStyle = $('#color').value + '66';
+    ctx.fillRect(d.x, d.y, d.w, d.h);
+  }
+}
+
+function updateBoxCount() { $('#box-count').textContent = `${state.boxes.length} boxes`; }
+
+// Canvas mouse drawing (display px -> normalized on mouseup)
+(function bindCanvas() {
+  const c = $('#canvas');
+  let start = null;
+  c.addEventListener('mousedown', (e) => {
+    const r = c.getBoundingClientRect();
+    start = { x: e.clientX - r.left, y: e.clientY - r.top };
+  });
+  c.addEventListener('mousemove', (e) => {
+    if (!start) return;
+    const r = c.getBoundingClientRect();
+    const x = e.clientX - r.left, y = e.clientY - r.top;
+    state.drawing = { x: Math.min(start.x, x), y: Math.min(start.y, y),
+                      w: Math.abs(x - start.x), h: Math.abs(y - start.y) };
+    redraw();
+  });
+  c.addEventListener('mouseup', () => {
+    if (state.drawing && state.drawing.w > 4 && state.drawing.h > 4) {
+      const d = state.drawing;
+      state.boxes.push({ x: d.x / c.width, y: d.y / c.height,
+                         w: d.w / c.width, h: d.h / c.height });
+      // New geometry invalidates prior approvals.
+      state.frameApproved = false; state.videoApproved = false;
+    }
+    state.drawing = null; start = null;
+    updateBoxCount(); redraw();
+  });
+})();
+
+function reqBody() {
+  return JSON.stringify({
+    filename: state.current.filename,
+    color: $('#color').value,
+    boxes: state.boxes,
+  });
+}
+
+async function previewFrame() {
+  if (state.boxes.length === 0) { msg('Draw at least one box'); return; }
+  msg('Rendering frame…');
+  const res = await fetch('api/preview_frame.php',
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: reqBody() });
+  const data = await res.json();
+  if (data.error) { msg('Frame error: ' + (data.detail || data.error)); return; }
+  msg('Frame ready — approve to continue');
+  $('#preview-out').innerHTML =
+    `<p>Preview frame — does this look right?</p><img src="${data.url}?t=${Date.now()}">
+     <div class="row-actions"><button id="approve-frame">Approve frame</button></div>`;
+  $('#approve-frame').onclick = () => { state.frameApproved = true; msg('Frame approved — now preview the video'); };
+}
+
+async function previewVideo() {
+  if (!state.frameApproved) { msg('Approve the frame first'); return; }
+  msg('Rendering video (may take a few seconds)…');
+  const res = await fetch('api/preview_video.php',
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: reqBody() });
+  const data = await res.json();
+  if (data.error) { msg('Video error: ' + (data.detail || data.error)); return; }
+  msg('Video ready — approve to enable batch');
+  $('#preview-out').innerHTML =
+    `<p>Preview video — does this look right?</p>
+     <video src="${data.url}?t=${Date.now()}" controls autoplay></video>
+     <div class="row-actions"><button id="approve-video">Approve video</button></div>`;
+  $('#approve-video').onclick = () => {
+    state.videoApproved = true;
+    $('#batch-pane').hidden = false;
+    renderBatch();
+    msg('Approved — select files and process the batch');
+    $('#batch-pane').scrollIntoView({ behavior: 'smooth' });
+  };
+}
+
+// ---- Batch ----
+function renderBatch() {
+  const cam = camFilter();
+  const wrap = $('#batch-list');
+  wrap.innerHTML = '';
+  for (const rec of state.records) {
+    for (const f of (rec.files || [])) {
+      if (!f.local || (cam && f.camera !== cam)) continue;
+      const row = document.createElement('label');
+      row.className = 'batch-row';
+      row.innerHTML = `<input type="checkbox" value="${f.filename}">
+        <span class="badge">${f.camera}</span> ${f.filename}
+        ${f.already_fixed ? '<span class="badge fixed">fixed</span>' : ''}
+        <span class="pstat" data-file="${f.filename}"></span>`;
+      wrap.appendChild(row);
+    }
+  }
+}
+
+function selectedFiles() {
+  return [...document.querySelectorAll('#batch-list input:checked')].map(c => c.value);
+}
+
+async function runBatch() {
+  if (!state.videoApproved) { msg('Approve a preview video first'); return; }
+  const files = selectedFiles();
+  if (files.length === 0) { msg('Select at least one file'); return; }
+  if (!confirm(`Process ${files.length} file(s)? Originals are backed up.`)) return;
+  msg('Submitting batch…');
+  const res = await fetch('api/process.php', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      date: $('#date').value.trim(), color: $('#color').value,
+      boxes: state.boxes, filenames: files,
+    }),
+  });
+  const data = await res.json();
+  if (data.error) { msg('Batch error: ' + data.error); return; }
+  pollStatus(data.job);
+}
+
+async function pollStatus(jobId) {
+  const res = await fetch(`api/status.php?job=${jobId}`);
+  const data = await res.json();
+  if (data.error) { msg('Status error: ' + data.error); return; }
+  $('#progress').textContent =
+    `Progress: ${data.finished}/${data.total} (done ${data.counts.done}, error ${data.counts.error})`;
+  for (const it of data.items) {
+    const el = document.querySelector(`.pstat[data-file="${it.filename}"]`);
+    if (el) { el.textContent = it.status; el.className = 'pstat ' + it.status; }
+  }
+  if (!data.complete) { setTimeout(() => pollStatus(jobId), 1500); }
+  else { msg(`Batch complete: ${data.counts.done} done, ${data.counts.error} error`); }
+}
+
+// ---- Wire up ----
+$('#load').onclick = loadDate;
+$('#camera').onchange = () => { renderList(); renderBatch(); };
+$('#color').oninput = redraw;
+$('#clear-boxes').onclick = () => { state.boxes = []; state.frameApproved = false; state.videoApproved = false; updateBoxCount(); redraw(); };
+$('#preview-frame').onclick = previewFrame;
+$('#preview-video').onclick = previewVideo;
+$('#select-cam').onclick = () => document.querySelectorAll('#batch-list input').forEach(c => c.checked = true);
+$('#run-batch').onclick = runBatch;
