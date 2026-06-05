@@ -417,7 +417,8 @@ if (!is_array($records)) {
 
 // Annotate each file: camera letter, local availability, already-fixed flag.
 foreach ($records as &$rec) {
-    foreach (($rec['files'] ?? []) as &$f) {
+    if (!isset($rec['files']) || !is_array($rec['files'])) continue;
+    foreach ($rec['files'] as &$f) {  // NOTE: iterate the real array, not (?? []) — by-ref over a temp expression does not write back
         $name = $f['filename'] ?? '';
         $f['camera']        = ($name !== '' && vbf_valid_filename($name)) ? $name[0] : null;
         $f['local']         = vbf_post_path($name) !== null;
