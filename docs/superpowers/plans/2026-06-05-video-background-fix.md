@@ -783,8 +783,12 @@ function vbf_worker_run(string $jobId): void {
         if ($bp !== null && !is_file($bp)) {
             if (!@copy($src, $bp)) { @unlink($out); vbf_job_update_item($jobId, $name, 'error', 'backup failed'); continue; }
         }
-        // Atomically replace the live file.
-        if (!@rename($out, $src)) { @unlink($out); vbf_job_update_item($jobId, $name, 'error', 'replace failed'); continue; }
+        // Atomically replace the live file (fall back to copy across filesystems —
+        // tmp/ and post/ may be on different mounts, where rename() raises EXDEV).
+        if (!@rename($out, $src)) {
+            if (@copy($out, $src)) { @unlink($out); }
+            else { @unlink($out); vbf_job_update_item($jobId, $name, 'error', 'replace failed'); continue; }
+        }
 
         vbf_job_update_item($jobId, $name, 'done', null);
     }
@@ -834,7 +838,8 @@ foreach ($names as $n) {
 $job = vbf_job_create($date, $color, $boxes, $names);
 
 // Detach the worker so the HTTP request returns immediately.
-$php    = PHP_BINARY;
+// Use php CLI; under php-fpm, PHP_BINARY points to the fpm binary, so prefer /usr/bin/php.
+$php    = is_executable('/usr/bin/php') ? '/usr/bin/php' : PHP_BINARY;
 $worker = escapeshellarg(__DIR__ . '/../worker.php');
 $jobId  = escapeshellarg($job['id']);
 $log    = escapeshellarg(vbf_jobs_dir() . '/' . $job['id'] . '.log');
