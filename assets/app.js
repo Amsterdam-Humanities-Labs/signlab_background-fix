@@ -108,19 +108,24 @@ function updateBoxCount() { $('#box-count').textContent = `${state.boxes.length}
 (function bindCanvas() {
   const c = $('#canvas');
   let start = null;
-  c.addEventListener('mousedown', (e) => {
+  // Map a pointer event to canvas coords, clamped to the canvas bounds so dragging
+  // past the video edge snaps the box exactly to 0 / width / height (corners are reachable).
+  const pos = (e) => {
     const r = c.getBoundingClientRect();
-    start = { x: e.clientX - r.left, y: e.clientY - r.top };
-  });
-  c.addEventListener('mousemove', (e) => {
+    return {
+      x: Math.max(0, Math.min(e.clientX - r.left, c.width)),
+      y: Math.max(0, Math.min(e.clientY - r.top, c.height)),
+    };
+  };
+  const onMove = (e) => {
     if (!start) return;
-    const r = c.getBoundingClientRect();
-    const x = e.clientX - r.left, y = e.clientY - r.top;
-    state.drawing = { x: Math.min(start.x, x), y: Math.min(start.y, y),
-                      w: Math.abs(x - start.x), h: Math.abs(y - start.y) };
+    const p = pos(e);
+    state.drawing = { x: Math.min(start.x, p.x), y: Math.min(start.y, p.y),
+                      w: Math.abs(p.x - start.x), h: Math.abs(p.y - start.y) };
     redraw();
-  });
-  c.addEventListener('mouseup', () => {
+  };
+  const onUp = () => {
+    if (!start) return;
     if (state.drawing && state.drawing.w > 4 && state.drawing.h > 4) {
       const d = state.drawing;
       state.boxes.push({ x: d.x / c.width, y: d.y / c.height,
@@ -130,7 +135,12 @@ function updateBoxCount() { $('#box-count').textContent = `${state.boxes.length}
     }
     state.drawing = null; start = null;
     updateBoxCount(); redraw();
-  });
+  };
+  c.addEventListener('mousedown', (e) => { start = pos(e); e.preventDefault(); });
+  // Listen on the window so the drag keeps tracking (and finishes) even when the
+  // cursor leaves the canvas/video area.
+  window.addEventListener('mousemove', onMove);
+  window.addEventListener('mouseup', onUp);
 })();
 
 function reqBody() {
