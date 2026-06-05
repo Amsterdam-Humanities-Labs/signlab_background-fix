@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Video Background Fix</title>
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+  <header>
+    <h1>Video Background Fix</h1>
+    <div class="toolbar">
+      <select id="date"><option value="">Loading dates…</option></select>
+      <select id="camera"><option value="">All cameras</option>
+        <option>L</option><option>M</option><option>R</option><option>A</option><option>B</option></select>
+      <button id="load">Load</button>
+      <span id="status-msg"></span>
+    </div>
+  </header>
+
+  <main>
+    <section id="list-pane"><h2>Takes</h2><div id="list"></div></section>
+
+    <section id="edit-pane" hidden>
+      <h2>Editor — <span id="edit-name"></span></h2>
+      <div class="editor-controls">
+        <label>Color <input id="color" type="color" value="#0000FF"></label>
+        <button id="clear-boxes">Clear boxes</button>
+        <button id="preview-frame">Preview frame</button>
+        <button id="preview-video">Preview video</button>
+        <span id="box-count">0 boxes</span>
+      </div>
+      <div class="stage">
+        <video id="video" controls crossorigin="anonymous"></video>
+        <canvas id="canvas"></canvas>
+      </div>
+      <div id="preview-out"></div>
+    </section>
+
+    <section id="batch-pane" hidden>
+      <h2>Batch</h2>
+      <p>Boxes defined on the reference clip apply to every checked file below.</p>
+      <div class="batch-controls">
+        <button id="select-cam">Select all (current camera filter)</button>
+        <button id="run-batch">Process selected</button>
+      </div>
+      <div id="batch-list"></div>
+      <div id="progress"></div>
+    </section>
+  </main>
+
+  <script src="assets/app.js"></script>
+</body>
+</html>

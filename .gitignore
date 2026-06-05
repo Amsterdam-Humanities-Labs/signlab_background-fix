@@ -1,3 +1,4 @@
 jobs/
 tmp/
 .superpowers/
+tests/fixtures/*.mp4
