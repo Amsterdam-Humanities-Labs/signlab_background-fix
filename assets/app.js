@@ -2,6 +2,10 @@
 
 const $ = (sel) => document.querySelector(sel);
 
+// Studio background is always the same rendering, so the mask fill is fixed to the
+// measured background color (matches ffmpeg's decode of the footage -> seamless patch).
+const FILL_COLOR = '#316CA4';
+
 // Escape untrusted strings (upstream API fields) before injecting into innerHTML.
 function esc(s) {
   return String(s ?? '').replace(/[&<>"']/g, (c) =>
@@ -87,7 +91,7 @@ window.addEventListener('resize', () => { if (!$('#edit-pane').hidden) sizeCanva
 function redraw() {
   const c = $('#canvas'), ctx = c.getContext('2d');
   ctx.clearRect(0, 0, c.width, c.height);
-  const color = $('#color').value;
+  const color = FILL_COLOR;
   const drawBox = (b) => {
     ctx.fillStyle = color + 'cc';
     ctx.strokeStyle = '#fff';
@@ -97,7 +101,7 @@ function redraw() {
   state.boxes.forEach(drawBox);
   if (state.drawing) {
     const d = state.drawing;
-    ctx.fillStyle = $('#color').value + '66';
+    ctx.fillStyle = FILL_COLOR + '66';
     ctx.fillRect(d.x, d.y, d.w, d.h);
   }
 }
@@ -146,7 +150,7 @@ function updateBoxCount() { $('#box-count').textContent = `${state.boxes.length}
 function reqBody() {
   return JSON.stringify({
     filename: state.current.filename,
-    color: $('#color').value,
+    color: FILL_COLOR,
     boxes: state.boxes,
   });
 }
@@ -218,7 +222,7 @@ async function runBatch() {
   const res = await fetch('api/process.php', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      date: $('#date').value.trim(), color: $('#color').value,
+      date: $('#date').value.trim(), color: FILL_COLOR,
       boxes: state.boxes, filenames: files,
     }),
   });
@@ -260,7 +264,6 @@ async function loadDates() {
 // ---- Wire up ----
 $('#load').onclick = loadDate;
 $('#camera').onchange = () => { renderList(); renderBatch(); };
-$('#color').oninput = redraw;
 $('#clear-boxes').onclick = () => { state.boxes = []; state.frameApproved = false; state.videoApproved = false; updateBoxCount(); redraw(); };
 $('#preview-frame').onclick = previewFrame;
 $('#preview-video').onclick = previewVideo;

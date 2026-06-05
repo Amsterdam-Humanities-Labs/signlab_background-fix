@@ -9,7 +9,7 @@ if (!is_array($in)) { http_response_code(400); echo json_encode(['error'=>'inval
 $src = vbf_post_path($in['filename'] ?? '');
 if ($src === null) { http_response_code(400); echo json_encode(['error'=>'invalid or missing filename']); exit; }
 
-$ff = vbf_hex_to_ffmpeg($in['color'] ?? '#0000FF');
+$ff = vbf_hex_to_ffmpeg($in['color'] ?? '#316CA4');
 if ($ff === null) { http_response_code(400); echo json_encode(['error'=>'invalid color']); exit; }
 
 $boxes = $in['boxes'] ?? [];

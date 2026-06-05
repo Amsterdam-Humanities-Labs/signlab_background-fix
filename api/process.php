@@ -9,7 +9,7 @@ if (!is_array($in)) { http_response_code(400); echo json_encode(['error'=>'inval
 $date = $in['date'] ?? '';
 if (!preg_match('/^\d{8}$/', $date)) { http_response_code(400); echo json_encode(['error'=>'invalid date']); exit; }
 
-$color = $in['color'] ?? '#0000FF';
+$color = $in['color'] ?? '#316CA4';  // measured studio background
 if (!preg_match('/^#?[0-9a-fA-F]{6}$/', $color)) { http_response_code(400); echo json_encode(['error'=>'invalid color']); exit; }
 
 $boxes = $in['boxes'] ?? [];

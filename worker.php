@@ -7,7 +7,7 @@ require_once __DIR__ . '/lib/jobs.php';
 function vbf_worker_run(string $jobId): void {
     $job = vbf_job_read($jobId);
     if ($job === null) return;
-    $ff = vbf_hex_to_ffmpeg($job['color']) ?? '0x0000FF';
+    $ff = vbf_hex_to_ffmpeg($job['color']) ?? '0x316CA4';  // measured studio background
     vbf_ensure_dir(vbf_tmp_dir());
     vbf_ensure_dir(vbf_backup_dir());
 
