@@ -80,32 +80,39 @@ function cardBody(rec, f) {
     </div>`;
 }
 
-function renderList() {
+// Local clips matching the camera filter, ordered by FILENAME (numeric-aware) so the
+// two actor parts within a take sort consistently across the whole list.
+function visibleClips() {
   const cam = camFilter();
+  const items = [];
+  for (const rec of state.records)
+    for (const f of (rec.files || []))
+      if (f.local && (!cam || f.camera === cam)) items.push({ rec, f });
+  items.sort((a, b) => a.f.filename.localeCompare(b.f.filename, undefined, { numeric: true }));
+  return items;
+}
+
+function renderList() {
   const wrap = $('#list');
   wrap.innerHTML = '';
-  let n = 0;
-  for (const rec of state.records) {
-    for (const f of (rec.files || [])) {
-      if (!f.local || (cam && f.camera !== cam)) continue;
-      const el = document.createElement('div');
-      el.className = 'card';
-      el.style.animationDelay = Math.min(n * 18, 400) + 'ms';
-      el.innerHTML = cardThumb(rec, f) + `<span class="card-cta">Edit ✎</span>` + cardBody(rec, f);
-      el.onclick = () => openEditor(f);
-      if (f.already_fixed) {
-        const rb = document.createElement('button');
-        rb.className = 'btn btn-ghost btn-sm restore-btn';
-        rb.textContent = '⟲ Restore original';
-        rb.onclick = (e) => { e.stopPropagation(); restoreFiles([f.filename], rb); };
-        el.querySelector('.card-body').appendChild(rb);
-      }
-      wrap.appendChild(el);
-      n++;
+  const clips = visibleClips();
+  clips.forEach(({ rec, f }, n) => {
+    const el = document.createElement('div');
+    el.className = 'card';
+    el.style.animationDelay = Math.min(n * 18, 400) + 'ms';
+    el.innerHTML = cardThumb(rec, f) + `<span class="card-cta">Edit ✎</span>` + cardBody(rec, f);
+    el.onclick = () => openEditor(f);
+    if (f.already_fixed) {
+      const rb = document.createElement('button');
+      rb.className = 'btn btn-ghost btn-sm restore-btn';
+      rb.textContent = '⟲ Restore original';
+      rb.onclick = (e) => { e.stopPropagation(); restoreFiles([f.filename], rb); };
+      el.querySelector('.card-body').appendChild(rb);
     }
-  }
-  $('#list-count').textContent = n ? `${n} clips` : '';
-  if (!n) wrap.innerHTML = '<p class="muted">No local clips for this date / camera.</p>';
+    wrap.appendChild(el);
+  });
+  $('#list-count').textContent = clips.length ? `${clips.length} clips` : '';
+  if (!clips.length) wrap.innerHTML = '<p class="muted">No local clips for this date / camera.</p>';
 }
 
 // ---- Editor ----
@@ -220,24 +227,18 @@ async function previewVideo() {
 
 // ---- Batch ----
 function renderBatch() {
-  const cam = camFilter();
   const wrap = $('#batch-list');
   wrap.innerHTML = '';
-  let n = 0;
-  for (const rec of state.records) {
-    for (const f of (rec.files || [])) {
-      if (!f.local || (cam && f.camera !== cam)) continue;
-      const el = document.createElement('label');
-      el.className = 'card bcard';
-      el.style.animationDelay = Math.min(n * 18, 400) + 'ms';
-      el.innerHTML = `<input type="checkbox" value="${esc(f.filename)}">
-        <span class="check">✓</span>
-        ${cardThumb(rec, f, f.filename)}
-        ${cardBody(rec, f)}`;
-      wrap.appendChild(el);
-      n++;
-    }
-  }
+  visibleClips().forEach(({ rec, f }, n) => {     // same filename ordering as the takes grid
+    const el = document.createElement('label');
+    el.className = 'card bcard';
+    el.style.animationDelay = Math.min(n * 18, 400) + 'ms';
+    el.innerHTML = `<input type="checkbox" value="${esc(f.filename)}">
+      <span class="check">✓</span>
+      ${cardThumb(rec, f, f.filename)}
+      ${cardBody(rec, f)}`;
+    wrap.appendChild(el);
+  });
 }
 
 function selectedFiles() {
@@ -431,7 +432,8 @@ async function loadJobItems(id, container) {
   container.innerHTML = '';
   const grid = document.createElement('div');
   grid.className = 'grid job-items';
-  for (const it of data.items) {
+  const items = [...data.items].sort((a, b) => a.filename.localeCompare(b.filename, undefined, { numeric: true }));
+  for (const it of items) {
     const c = document.createElement('div');
     c.className = 'card mini' + (it.status === 'done' ? ' done-card' : '');
     c.innerHTML = `<div class="card-thumb">
