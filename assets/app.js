@@ -18,6 +18,8 @@ const state = {
   drawing: null,        // in-progress box (display px)
   frameApproved: false,
   videoApproved: false,
+  jobs: [],             // last queue snapshot (for date filtering)
+  bust: {},             // filename -> cache-bust token for thumbnails
 };
 
 function msg(text) { $('#status-msg').textContent = text; }
@@ -39,7 +41,12 @@ async function loadDate() {
 function camFilter() { return $('#camera').value; }
 
 // Thumbnails live next to the video: same URL with .mp4 -> .jpg.
-function thumbUrl(f) { return (f.view_url || '').replace(/\.mp4$/i, '.jpg'); }
+// A per-file cache-bust token forces a reload after the file changes (fix/restore).
+function thumbUrl(f) {
+  const base = (f.view_url || '').replace(/\.mp4$/i, '.jpg');
+  const t = state.bust[f.filename];
+  return t ? base + '?t=' + t : base;
+}
 
 // Shared card pieces ------------------------------------------------
 function cardThumb(rec, f, pstatFile) {
@@ -73,6 +80,13 @@ function renderList() {
       el.style.animationDelay = Math.min(n * 18, 400) + 'ms';
       el.innerHTML = cardThumb(rec, f) + `<span class="card-cta">Edit ✎</span>` + cardBody(rec, f);
       el.onclick = () => openEditor(f);
+      if (f.already_fixed) {
+        const rb = document.createElement('button');
+        rb.className = 'btn btn-ghost btn-sm restore-btn';
+        rb.textContent = '⟲ Restore original';
+        rb.onclick = (e) => { e.stopPropagation(); restoreFiles([f.filename], rb); };
+        el.querySelector('.card-body').appendChild(rb);
+      }
       wrap.appendChild(el);
       n++;
     }
@@ -271,11 +285,14 @@ async function pollStatus(jobId) {
 // When a clip finishes, refresh its thumbnail to the masked result and make the
 // card open the fixed video on click.
 function markDone(card, filename) {
+  const f = fileByName(filename);
+  if (f) f.already_fixed = true;
+  state.bust[filename] = Date.now();          // force thumbnail reload
   if (!card || card.dataset.done) return;
   card.dataset.done = '1';
   card.classList.add('done-card');
   const img = card.querySelector('img.thumb');
-  if (img) { img.classList.remove('noimg'); img.src = thumbForFile(filename) + '?t=' + Date.now(); }
+  if (img) { img.classList.remove('noimg'); img.src = thumbForFile(filename); }
   card.addEventListener('click', (ev) => { ev.preventDefault(); viewResult(filename); }, true);
 }
 
@@ -284,6 +301,42 @@ function fileByName(filename) {
   return null;
 }
 function thumbForFile(filename) { const f = fileByName(filename); return f ? thumbUrl(f) : ''; }
+
+// ---- Restore originals ----
+function selectedFixedFiles() {
+  const sel = new Set(selectedFiles());
+  const out = [];
+  for (const rec of state.records) for (const f of (rec.files || []))
+    if (sel.has(f.filename) && f.already_fixed) out.push(f.filename);
+  return out;
+}
+
+async function restoreFiles(filenames, btnEl) {
+  if (!filenames.length) { msg('No fixed files selected to restore'); return; }
+  if (!confirm(`Restore ${filenames.length} file(s) to original? This removes the fix and its backup.`)) return;
+  const label = btnEl ? btnEl.textContent : '';
+  const reset = () => { if (btnEl) { btnEl.disabled = false; btnEl.textContent = label; } };
+  if (btnEl) { btnEl.disabled = true; btnEl.textContent = 'Restoring…'; }
+  msg('Restoring…');
+  let data;
+  try {
+    const res = await fetch('api/restore.php', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ filenames }),
+    });
+    data = await res.json();
+  } catch (e) { msg('Restore failed (network)'); reset(); return; }
+  if (data.error) { msg('Restore error: ' + data.error); reset(); return; }
+
+  let ok = 0, fail = 0;
+  for (const n of filenames) {
+    const r = data.results[n];
+    if (r && r.ok) { ok++; const f = fileByName(n); if (f) f.already_fixed = false; state.bust[n] = Date.now(); }
+    else fail++;
+  }
+  msg(`Restored ${ok}${fail ? `, ${fail} failed` : ''}`);
+  renderList(); renderBatch();   // re-render with refreshed thumbs + cleared fixed state
+}
 
 // ---- Result modal ----
 function openModal(title, bodyHtml) {
@@ -321,17 +374,23 @@ async function loadJobs() {
   try {
     const res = await fetch('api/jobs.php');
     const data = await res.json();
-    const jobs = data.jobs || [];
-    renderJobs(jobs);
+    state.jobs = data.jobs || [];
+    renderJobs();
     // Keep refreshing while any job is still running.
     clearTimeout(loadJobs._t);
-    if (jobs.some(j => !j.complete)) loadJobs._t = setTimeout(loadJobs, 1500);
+    if (state.jobs.some(j => !j.complete)) loadJobs._t = setTimeout(loadJobs, 1500);
   } catch (e) { /* leave previous render in place */ }
 }
 
-function renderJobs(jobs) {
+// Render the queue, filtered to the currently selected date.
+function renderJobs() {
   const wrap = $('#queue');
-  if (!jobs.length) { wrap.innerHTML = '<p class="muted">No batches yet.</p>'; return; }
+  const date = $('#date').value;
+  const jobs = date ? state.jobs.filter(j => j.date === date) : state.jobs;
+  if (!jobs.length) {
+    wrap.innerHTML = `<p class="muted">No batches${date ? ' for ' + esc(date) : ''} yet.</p>`;
+    return;
+  }
   wrap.innerHTML = jobs.map(j => {
     const when = String(j.created || '').replace('T', ' ').slice(0, 19);
     const cls = !j.complete ? 'job-active' : (j.counts.error ? 'job-err' : 'job-done');
@@ -350,7 +409,9 @@ function renderJobs(jobs) {
 // ---- Wire up ----
 $('#load').onclick = loadDate;
 $('#refresh-queue').onclick = loadJobs;
+$('#date').onchange = renderJobs;   // queue follows the selected date
 $('#camera').onchange = () => { renderList(); renderBatch(); };
+$('#restore-batch').onclick = function () { restoreFiles(selectedFixedFiles(), this); };
 $('#clear-boxes').onclick = () => { state.boxes = []; state.frameApproved = false; state.videoApproved = false; updateBoxCount(); redraw(); };
 $('#preview-frame').onclick = previewFrame;
 $('#preview-video').onclick = previewVideo;

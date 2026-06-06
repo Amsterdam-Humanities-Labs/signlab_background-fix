@@ -156,6 +156,9 @@ main { max-width: 1320px; margin: 0 auto; padding: 22px; display: flex; flex-dir
   font-family: var(--disp); font-weight: 700; font-size: 13px; letter-spacing: .03em;
   background: var(--accent); color: #06121d; padding: 7px 16px; border-radius: 20px; box-shadow: var(--shadow);
 }
+.restore-btn { margin-top: 8px; width: 100%; color: var(--muted); }
+.restore-btn:hover { color: var(--bad); border-color: var(--bad); background: rgba(240,96,77,.08); }
+
 .card-cta { transform: translate(-50%, -50%) translateY(6px); }
 .card:hover .card-cta { opacity: 1; transform: translate(-50%, -50%); }
 
