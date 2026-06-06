@@ -48,12 +48,11 @@ function vbf_exec(array $argv): array {
 function vbf_render(string $src, string $dst, array $boxes, string $ffColor): array {
     $dims = vbf_probe_dims($src);
     if ($dims === null) return [false, "probe failed for $src"];
-    $chain = vbf_build_drawbox($boxes, $dims['w'], $dims['h'], $ffColor);
-    if ($chain === '') return [false, 'no boxes provided'];
-    $argv = ['ffmpeg', '-hide_banner', '-loglevel', 'error', '-y',
-             '-i', $src, '-vf', $chain,
-             '-c:v', 'libx264', '-crf', '18', '-preset', 'veryfast',
-             '-pix_fmt', 'yuv420p', '-c:a', 'copy', '-movflags', '+faststart', $dst];
+    $chain = vbf_build_drawbox($boxes, $dims['w'], $dims['h'], $ffColor);  // '' when no boxes
+    $vf = $chain === '' ? [] : ['-vf', $chain];
+    $argv = array_merge(['ffmpeg', '-hide_banner', '-loglevel', 'error', '-y', '-i', $src], $vf,
+             ['-c:v', 'libx264', '-crf', '18', '-preset', 'veryfast',
+             '-pix_fmt', 'yuv420p', '-c:a', 'copy', '-movflags', '+faststart', $dst]);
     [$code, , $err] = vbf_exec($argv);
     if ($code !== 0) return [false, substr(trim($err), -2000)];
     return [true, ''];
@@ -63,11 +62,10 @@ function vbf_render(string $src, string $dst, array $boxes, string $ffColor): ar
 function vbf_render_frame(string $src, string $dst, array $boxes, string $ffColor, float $atSeconds = 0.0): array {
     $dims = vbf_probe_dims($src);
     if ($dims === null) return [false, "probe failed for $src"];
-    $chain = vbf_build_drawbox($boxes, $dims['w'], $dims['h'], $ffColor);
-    if ($chain === '') return [false, 'no boxes provided'];
-    $argv = ['ffmpeg', '-hide_banner', '-loglevel', 'error', '-y',
-             '-ss', (string) $atSeconds, '-i', $src, '-vf', $chain,
-             '-frames:v', '1', $dst];
+    $chain = vbf_build_drawbox($boxes, $dims['w'], $dims['h'], $ffColor);  // '' when no boxes
+    $vf = $chain === '' ? [] : ['-vf', $chain];
+    $argv = array_merge(['ffmpeg', '-hide_banner', '-loglevel', 'error', '-y',
+             '-ss', (string) $atSeconds, '-i', $src], $vf, ['-frames:v', '1', $dst]);
     [$code, , $err] = vbf_exec($argv);
     if ($code !== 0) return [false, substr(trim($err), -2000)];
     return [true, ''];

@@ -63,12 +63,20 @@
         <button id="preview-frame" class="btn btn-sm">1 · Preview frame</button>
         <button id="preview-video" class="btn btn-sm">2 · Preview video</button>
       </div>
-      <p class="hint">Drag on the frame to draw mask boxes. Drag past the edge to fill a corner cleanly.</p>
-      <div class="stage">
-        <video id="video" controls crossorigin="anonymous"></video>
-        <canvas id="canvas"></canvas>
+      <p class="hint">Drag on the frame to draw mask boxes (optional). Drag past the edge to fill a corner cleanly.
+        Boxes are optional — clips off-spec are auto-resized to 1764×1534 even with no box.</p>
+      <div class="edit-row">
+        <div class="edit-col">
+          <p class="label">Source — draw here</p>
+          <div class="stage">
+            <video id="video" controls crossorigin="anonymous"></video>
+            <canvas id="canvas"></canvas>
+          </div>
+        </div>
+        <div class="edit-col">
+          <div id="preview-out"><p class="muted">Preview frame / video appears here.</p></div>
+        </div>
       </div>
-      <div id="preview-out"></div>
     </section>
 
     <section id="batch-pane" class="panel" hidden>

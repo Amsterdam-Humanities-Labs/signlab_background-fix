@@ -13,7 +13,7 @@ $ff = vbf_hex_to_ffmpeg($in['color'] ?? '#316CA4');
 if ($ff === null) { http_response_code(400); echo json_encode(['error'=>'invalid color']); exit; }
 
 $boxes = $in['boxes'] ?? [];
-if (!is_array($boxes) || count($boxes) === 0) { http_response_code(400); echo json_encode(['error'=>'no boxes']); exit; }
+if (!is_array($boxes)) $boxes = [];   // boxes optional: empty = normalize-only
 
 $at = isset($in['at']) ? (float) $in['at'] : 0.0;
 vbf_ensure_dir(vbf_tmp_dir());

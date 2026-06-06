@@ -13,7 +13,7 @@ $color = $in['color'] ?? '#316CA4';  // measured studio background
 if (!preg_match('/^#?[0-9a-fA-F]{6}$/', $color)) { http_response_code(400); echo json_encode(['error'=>'invalid color']); exit; }
 
 $boxes = $in['boxes'] ?? [];
-if (!is_array($boxes) || count($boxes) === 0) { http_response_code(400); echo json_encode(['error'=>'no boxes']); exit; }
+if (!is_array($boxes)) $boxes = [];   // boxes optional: empty = normalize-only
 
 $names = $in['filenames'] ?? [];
 if (!is_array($names) || count($names) === 0) { http_response_code(400); echo json_encode(['error'=>'no files selected']); exit; }

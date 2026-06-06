@@ -16,8 +16,6 @@ const state = {
   current: null,        // {filename, view_url}
   boxes: [],            // normalized {x,y,w,h}
   drawing: null,        // in-progress box (display px)
-  frameApproved: false,
-  videoApproved: false,
   jobs: [],             // last queue snapshot (for date filtering)
   bust: {},             // filename -> cache-bust token for thumbnails
   expandedJobs: new Set(), // queue rows currently expanded to show thumbnails
@@ -49,6 +47,7 @@ async function loadDate() {
   state.records = data.records;
   renderList();
   renderBatch();
+  $('#batch-pane').hidden = false;   // batch is always available (no approval gate)
   msg(`${data.records.length} takes`);
 }
 
@@ -113,8 +112,6 @@ function renderList() {
 function openEditor(f) {
   state.current = f;
   state.boxes = [];
-  state.frameApproved = false;
-  state.videoApproved = false;
   $('#edit-pane').hidden = false;
   $('#edit-name').textContent = f.filename;
   $('#preview-out').innerHTML = '';
@@ -179,8 +176,6 @@ function updateBoxCount() { $('#box-count').textContent = `${state.boxes.length}
       const d = state.drawing;
       state.boxes.push({ x: d.x / c.width, y: d.y / c.height,
                          w: d.w / c.width, h: d.h / c.height });
-      // New geometry invalidates prior approvals.
-      state.frameApproved = false; state.videoApproved = false;
     }
     state.drawing = null; start = null;
     updateBoxCount(); redraw();
@@ -201,38 +196,26 @@ function reqBody() {
 }
 
 async function previewFrame() {
-  if (state.boxes.length === 0) { msg('Draw at least one box'); return; }
   msg('Rendering frame…');
   const res = await fetch('api/preview_frame.php',
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: reqBody() });
   const data = await res.json();
   if (data.error) { msg('Frame error: ' + (data.detail || data.error)); return; }
-  msg('Frame ready — approve to continue');
+  msg('Frame preview ready');
   $('#preview-out').innerHTML =
-    `<p>Preview frame — does this look right?</p><img src="${data.url}?t=${Date.now()}">
-     <div class="row-actions"><button id="approve-frame">Approve frame</button></div>`;
-  $('#approve-frame').onclick = () => { state.frameApproved = true; msg('Frame approved — now preview the video'); };
+    `<p class="label">Preview frame</p><img src="${data.url}?t=${Date.now()}">`;
 }
 
 async function previewVideo() {
-  if (!state.frameApproved) { msg('Approve the frame first'); return; }
   msg('Rendering video (may take a few seconds)…');
   const res = await fetch('api/preview_video.php',
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: reqBody() });
   const data = await res.json();
   if (data.error) { msg('Video error: ' + (data.detail || data.error)); return; }
-  msg('Video ready — approve to enable batch');
+  msg('Video preview ready');
   $('#preview-out').innerHTML =
-    `<p>Preview video — does this look right?</p>
-     <video src="${data.url}?t=${Date.now()}" controls autoplay></video>
-     <div class="row-actions"><button id="approve-video">Approve video</button></div>`;
-  $('#approve-video').onclick = () => {
-    state.videoApproved = true;
-    $('#batch-pane').hidden = false;
-    renderBatch();
-    msg('Approved — select files and process the batch');
-    $('#batch-pane').scrollIntoView({ behavior: 'smooth' });
-  };
+    `<p class="label">Preview video</p>
+     <video src="${data.url}?t=${Date.now()}" controls autoplay></video>`;
 }
 
 // ---- Batch ----
@@ -262,7 +245,6 @@ function selectedFiles() {
 }
 
 async function runBatch() {
-  if (!state.videoApproved) { msg('Approve a preview video first'); return; }
   const files = selectedFiles();
   if (files.length === 0) { msg('Select at least one file'); return; }
   if (!confirm(`Process ${files.length} file(s)? Originals are backed up.`)) return;
@@ -471,7 +453,7 @@ $('#refresh-queue').onclick = loadJobs;
 $('#date').onchange = renderJobs;   // queue follows the selected date
 $('#camera').onchange = () => { renderList(); renderBatch(); };
 $('#restore-batch').onclick = function () { restoreFiles(selectedFixedFiles(), this); };
-$('#clear-boxes').onclick = () => { state.boxes = []; state.frameApproved = false; state.videoApproved = false; updateBoxCount(); redraw(); };
+$('#clear-boxes').onclick = () => { state.boxes = []; updateBoxCount(); redraw(); };
 $('#preview-frame').onclick = previewFrame;
 $('#preview-video').onclick = previewVideo;
 $('#select-cam').onclick = () => document.querySelectorAll('#batch-list input').forEach(c => c.checked = true);
