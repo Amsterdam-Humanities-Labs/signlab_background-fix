@@ -218,6 +218,28 @@ main { max-width: 1320px; margin: 0 auto; padding: 22px; display: flex; flex-dir
 .progress-line { font-family: var(--mono); font-size: 12.5px; color: var(--accent); min-height: 1em; margin-bottom: 10px; }
 .mono { font-family: var(--mono); }
 
+/* Result indicator on finished batch cards */
+.card.done-card { border-color: rgba(70,196,106,.55); }
+.card.done-card::before {
+  content: "▶ view result"; position: absolute; left: 50%; top: 42%; transform: translate(-50%,-50%);
+  z-index: 4; opacity: 0; transition: opacity .2s; pointer-events: none;
+  font-family: var(--disp); font-weight: 700; font-size: 12px; letter-spacing: .03em;
+  background: var(--good); color: #06121d; padding: 7px 14px; border-radius: 20px; box-shadow: var(--shadow);
+}
+.card.done-card:hover::before { opacity: 1; }
+
+/* Modal (result viewer) */
+.modal { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center;
+  background: rgba(6,10,14,.72); backdrop-filter: blur(6px); animation: fade .15s both; }
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+.modal-card { position: relative; width: min(860px, 92vw); max-height: 90vh; overflow: auto;
+  background: var(--bg-elev); border: 1px solid var(--line); border-radius: 14px; padding: 20px; box-shadow: var(--shadow); }
+.modal-card h3 { margin: 0 28px 12px 0; font-size: 14px; color: var(--accent); }
+.modal-card video, .modal-card img { width: 100%; border-radius: 10px; border: 1px solid var(--line); display: block; }
+.modal-close { position: absolute; top: 12px; right: 12px; width: 30px; height: 30px; border-radius: 8px;
+  background: var(--bg-elev2); border: 1px solid var(--line); color: var(--text); cursor: pointer; font-size: 14px; }
+.modal-close:hover { border-color: var(--bad); color: var(--bad); }
+
 @media (max-width: 560px) {
   .toolbar { width: 100%; margin-left: 0; }
   .job { grid-template-columns: 1fr 1fr; row-gap: 4px; }

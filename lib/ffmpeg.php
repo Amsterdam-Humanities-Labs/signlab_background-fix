@@ -72,3 +72,22 @@ function vbf_render_frame(string $src, string $dst, array $boxes, string $ffColo
     if ($code !== 0) return [false, substr(trim($err), -2000)];
     return [true, ''];
 }
+
+// Extract a representative thumbnail (middle frame) from $src to a JPG $dst.
+// Falls back to the first frame if the midpoint seek fails. Returns [bool, err].
+function vbf_extract_thumb(string $src, string $dst): array {
+    $mid = 0.0;
+    [$c, $o] = vbf_exec(['ffprobe', '-v', 'error', '-show_entries', 'format=duration',
+                         '-of', 'csv=p=0', $src]);
+    if ($c === 0) { $d = (float) trim($o); if ($d > 0) $mid = $d / 2.0; }
+
+    $argv = ['ffmpeg', '-hide_banner', '-loglevel', 'error', '-y',
+             '-ss', (string) $mid, '-i', $src, '-frames:v', '1', '-q:v', '3', $dst];
+    [$code, , $err] = vbf_exec($argv);
+    if ($code !== 0) { // fallback: first frame
+        $argv = ['ffmpeg', '-hide_banner', '-loglevel', 'error', '-y',
+                 '-i', $src, '-frames:v', '1', '-q:v', '3', $dst];
+        [$code, , $err] = vbf_exec($argv);
+    }
+    return $code === 0 ? [true, ''] : [false, substr(trim($err), -2000)];
+}

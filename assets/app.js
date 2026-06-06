@@ -260,10 +260,44 @@ async function pollStatus(jobId) {
     `Progress: ${data.finished}/${data.total} (done ${data.counts.done}, error ${data.counts.error})`;
   for (const it of data.items) {
     const el = document.querySelector(`.pstat[data-file="${it.filename}"]`);
-    if (el) { el.textContent = it.status; el.className = 'pstat ' + it.status; }
+    if (!el) continue;
+    el.textContent = it.status; el.className = 'pstat ' + it.status;
+    if (it.status === 'done') markDone(el.closest('.card'), it.filename);
   }
   if (!data.complete) { setTimeout(() => pollStatus(jobId), 1500); }
   else { msg(`Batch complete: ${data.counts.done} done, ${data.counts.error} error`); loadJobs(); }
+}
+
+// When a clip finishes, refresh its thumbnail to the masked result and make the
+// card open the fixed video on click.
+function markDone(card, filename) {
+  if (!card || card.dataset.done) return;
+  card.dataset.done = '1';
+  card.classList.add('done-card');
+  const img = card.querySelector('img.thumb');
+  if (img) { img.classList.remove('noimg'); img.src = thumbForFile(filename) + '?t=' + Date.now(); }
+  card.addEventListener('click', (ev) => { ev.preventDefault(); viewResult(filename); }, true);
+}
+
+function fileByName(filename) {
+  for (const rec of state.records) for (const f of (rec.files || [])) if (f.filename === filename) return f;
+  return null;
+}
+function thumbForFile(filename) { const f = fileByName(filename); return f ? thumbUrl(f) : ''; }
+
+// ---- Result modal ----
+function openModal(title, bodyHtml) {
+  $('#modal-title').textContent = title;
+  $('#modal-body').innerHTML = bodyHtml;
+  $('#modal').hidden = false;
+}
+function closeModal() { $('#modal').hidden = true; $('#modal-body').innerHTML = ''; }
+
+function viewResult(filename) {
+  const f = fileByName(filename);
+  if (!f || !f.view_url) return;
+  const bust = f.view_url + '?t=' + Date.now();   // bypass cache -> show the fixed file
+  openModal(filename + ' — fixed', `<video src="${esc(bust)}" controls autoplay loop></video>`);
 }
 
 // ---- Date dropdown ----
@@ -322,6 +356,9 @@ $('#preview-frame').onclick = previewFrame;
 $('#preview-video').onclick = previewVideo;
 $('#select-cam').onclick = () => document.querySelectorAll('#batch-list input').forEach(c => c.checked = true);
 $('#run-batch').onclick = runBatch;
+$('#modal-close').onclick = closeModal;
+$('#modal').addEventListener('click', (e) => { if (e.target.id === 'modal') closeModal(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
 
 // Populate the date dropdown and queue/history on startup.
 loadDates();

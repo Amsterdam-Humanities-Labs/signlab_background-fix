@@ -32,6 +32,9 @@ $php    = is_executable('/usr/bin/php') ? '/usr/bin/php' : PHP_BINARY;
 $worker = escapeshellarg(__DIR__ . '/../worker.php');
 $jobId  = escapeshellarg($job['id']);
 $log    = escapeshellarg(vbf_jobs_dir() . '/' . $job['id'] . '.log');
-exec(escapeshellarg($php) . " $worker $jobId > $log 2>&1 &");
+// setsid fully detaches the worker into its own session so it keeps running after the
+// HTTP request ends and after the browser/tab is closed (survives php-fpm recycling).
+$setsid = is_executable('/usr/bin/setsid') ? '/usr/bin/setsid ' : '';
+exec($setsid . escapeshellarg($php) . " $worker $jobId > $log 2>&1 &");
 
 echo json_encode(['job' => $job['id'], 'count' => count($names)]);

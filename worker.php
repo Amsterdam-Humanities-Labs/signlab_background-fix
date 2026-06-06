@@ -23,10 +23,13 @@ function vbf_worker_run(string $jobId): void {
         [$ok, $err] = vbf_render($src, $out, $job['boxes'], $ff);
         if (!$ok) { @unlink($out); vbf_job_update_item($jobId, $name, 'error', $err); continue; }
 
-        // Back up the TRUE original exactly once.
+        // Back up the TRUE original exactly once (video + its original thumbnail).
         $bp = vbf_backup_path($name);
         if ($bp !== null && !is_file($bp)) {
             if (!@copy($src, $bp)) { @unlink($out); vbf_job_update_item($jobId, $name, 'error', 'backup failed'); continue; }
+            $srcJpg0 = preg_replace('/\.mp4$/i', '.jpg', $src);
+            $bpJpg0  = preg_replace('/\.mp4$/i', '.jpg', $bp);
+            if (is_file($srcJpg0) && !is_file($bpJpg0)) @copy($srcJpg0, $bpJpg0);
         }
 
         // Replace the live file atomically. tmp/ and post/ are on different filesystems
@@ -42,6 +45,14 @@ function vbf_worker_run(string $jobId): void {
                 vbf_job_update_item($jobId, $name, 'error', 'replace failed'); continue;
             }
         }
+
+        // Regenerate the thumbnail from the middle of the FIXED video so the masked
+        // result shows everywhere (grid, batch). Best-effort: never fails the item.
+        $jpg = preg_replace('/\.mp4$/i', '.jpg', $src);
+        $thumbTmp = dirname($src) . '/.vbf_thumb_' . bin2hex(random_bytes(6)) . '.jpg';
+        [$tok] = vbf_extract_thumb($src, $thumbTmp);
+        if ($tok) { if (!@rename($thumbTmp, $jpg)) @unlink($thumbTmp); }
+        else { @unlink($thumbTmp); }
 
         vbf_job_update_item($jobId, $name, 'done', null);
     }

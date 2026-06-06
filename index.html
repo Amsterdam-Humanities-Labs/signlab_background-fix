@@ -79,11 +79,20 @@
           <button id="run-batch" class="btn btn-accent btn-sm">Process selected →</button>
         </div>
       </div>
-      <p class="hint">The boxes you defined apply to every selected clip. Click cards to select.</p>
+      <p class="hint">The boxes you defined apply to every selected clip. Click cards to select.
+        Processing runs on the server — you can safely close this tab and check back later under Queue&nbsp;/&nbsp;History.</p>
       <div id="progress" class="progress-line"></div>
       <div id="batch-list" class="grid"></div>
     </section>
   </main>
+
+  <div id="modal" class="modal" hidden>
+    <div class="modal-card">
+      <button id="modal-close" class="modal-close" aria-label="Close">✕</button>
+      <h3 id="modal-title" class="mono"></h3>
+      <div id="modal-body"></div>
+    </div>
+  </div>
 
   <script src="assets/app.js"></script>
 </body>
