@@ -19,6 +19,16 @@ function vbf_build_drawbox(array $boxes, int $w, int $h, string $color): string 
     return implode(',', $parts);
 }
 
+// Returns the video's r_frame_rate as an ffmpeg-compatible string (e.g. "2997/50"),
+// or null on failure. Used to keep the normalize canvas at the source frame rate.
+function vbf_probe_fps(string $path): ?string {
+    [$code, $out] = vbf_exec(['ffprobe', '-v', 'error', '-select_streams', 'v:0',
+                              '-show_entries', 'stream=r_frame_rate', '-of', 'csv=p=0', $path]);
+    if ($code !== 0) return null;
+    $r = trim($out);
+    return ($r === '' || $r === '0/0') ? null : $r;
+}
+
 // Returns ['w'=>int,'h'=>int] or null on failure.
 function vbf_probe_dims(string $path): ?array {
     $cmd = ['ffprobe', '-v', 'error', '-select_streams', 'v:0',
@@ -81,7 +91,8 @@ function vbf_render_canvas(string $src, string $dst, array $boxes, string $ffCol
     if ($dims === null) return [false, "probe failed for $src"];
     $chain = vbf_build_drawbox($boxes, $dims['w'], $dims['h'], $ffColor);
     $fg = $chain === '' ? '[0:v]copy[fg]' : "[0:v]{$chain}[fg]";
-    $fc = "color=c={$canvasHex}:s={$tw}x{$th}[bg];{$fg};[bg][fg]overlay=x={$offx}:y={$offy}:shortest=1[v]";
+    $fps = vbf_probe_fps($src) ?: '25';   // keep canvas at source frame rate (else overlay forces 25)
+    $fc = "color=c={$canvasHex}:s={$tw}x{$th}:r={$fps}[bg];{$fg};[bg][fg]overlay=x={$offx}:y={$offy}:shortest=1[v]";
     $argv = ['ffmpeg', '-hide_banner', '-loglevel', 'error', '-y', '-i', $src,
              '-filter_complex', $fc, '-map', '[v]', '-map', '0:a?',
              '-c:v', 'libx264', '-crf', '18', '-preset', 'veryfast',
