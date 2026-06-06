@@ -19,7 +19,7 @@ $at = isset($in['at']) ? (float) $in['at'] : 0.0;
 vbf_ensure_dir(vbf_tmp_dir());
 $out = vbf_tmp_dir() . '/frame_' . bin2hex(random_bytes(6)) . '.png';
 
-[$ok, $err] = vbf_render_frame($src, $out, $boxes, $ff, $at);
+[$ok, $err] = vbf_process_frame($src, $out, $boxes, $ff, $at);  // preview = final (mask + normalize)
 if (!$ok) { http_response_code(500); echo json_encode(['error'=>'render failed','detail'=>$err]); exit; }
 
 echo json_encode(['url' => 'tmp/' . basename($out)]);

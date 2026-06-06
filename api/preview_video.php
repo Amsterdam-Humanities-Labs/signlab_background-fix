@@ -19,7 +19,7 @@ if (!is_array($boxes) || count($boxes) === 0) { http_response_code(400); echo js
 vbf_ensure_dir(vbf_tmp_dir());
 $out = vbf_tmp_dir() . '/preview_' . bin2hex(random_bytes(6)) . '.mp4';
 
-[$ok, $err] = vbf_render($src, $out, $boxes, $ff);
+[$ok, $err] = vbf_process_video($src, $out, $boxes, $ff);  // preview = final (mask + normalize)
 if (!$ok) { http_response_code(500); echo json_encode(['error'=>'render failed','detail'=>$err]); exit; }
 
 echo json_encode(['url' => 'tmp/' . basename($out)]);

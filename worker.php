@@ -3,23 +3,8 @@ require_once __DIR__ . '/lib/paths.php';
 require_once __DIR__ . '/lib/ffmpeg.php';
 require_once __DIR__ . '/lib/jobs.php';
 
-// Canonical canvas (matches reference clip M20241209_9819): clips whose dimensions
-// differ are composited onto this size with the person centered and head anchored.
-const VBF_TARGET_W = 1764;
-const VBF_TARGET_H = 1534;
-const VBF_TARGET_HEAD_TOP = 125;   // target y of head-top (8.15% of height, from reference)
-
-// Detect the person's horizontal centre + head-top (source px) via lib/detect_center.py.
-// Returns ['cx'=>float,'head_top'=>float] or null if detection failed.
-function vbf_detect_center(string $src): ?array {
-    [$code, $out] = vbf_exec(['python3', __DIR__ . '/lib/detect_center.py', $src]);
-    if ($code !== 0) return null;
-    $info = json_decode(trim($out), true);
-    if (!is_array($info) || empty($info['ok'])) return null;
-    return ['cx' => (float) $info['cx'], 'head_top' => (float) $info['head_top']];
-}
-
 // Process every queued item in a job. Safe to call in-process (tests) or via CLI.
+// Normalization constants + helpers live in lib/ffmpeg.php (shared with preview).
 function vbf_worker_run(string $jobId): void {
     $job = vbf_job_read($jobId);
     if ($job === null) return;
@@ -37,26 +22,11 @@ function vbf_worker_run(string $jobId): void {
 
         $dims = vbf_probe_dims($src);
         if ($dims === null) { vbf_job_update_item($jobId, $name, 'error', 'probe failed'); continue; }
-        $needsNorm = ($dims['w'] != VBF_TARGET_W || $dims['h'] != VBF_TARGET_H);
-        $hasBoxes  = !empty($job['boxes']);
-        if (!$needsNorm && !$hasBoxes) { vbf_job_update_item($jobId, $name, 'done', null); continue; }
+        // Nothing to do for an on-spec clip with no mask boxes.
+        if (!vbf_needs_norm($dims) && empty($job['boxes'])) { vbf_job_update_item($jobId, $name, 'done', null); continue; }
 
         $out = vbf_tmp_dir() . '/out_' . bin2hex(random_bytes(6)) . '.mp4';
-        if ($needsNorm) {
-            // Canonicalise to VBF_TARGET_W x VBF_TARGET_H: centre the person, anchor head.
-            $c = vbf_detect_center($src);
-            if ($c !== null) {
-                $offx = (int) round(VBF_TARGET_W / 2 - $c['cx']);
-                $offy = (int) round(VBF_TARGET_HEAD_TOP - $c['head_top']);
-            } else { // fallback: simple centre placement
-                $offx = (int) round((VBF_TARGET_W - $dims['w']) / 2);
-                $offy = (int) round((VBF_TARGET_H - $dims['h']) / 2);
-            }
-            [$ok, $err] = vbf_render_canvas($src, $out, $job['boxes'], $ff,
-                            VBF_TARGET_W, VBF_TARGET_H, $offx, $offy, $ff);
-        } else {
-            [$ok, $err] = vbf_render($src, $out, $job['boxes'], $ff);
-        }
+        [$ok, $err] = vbf_process_video($src, $out, $job['boxes'], $ff);   // mask + normalize-if-off-spec
         if (!$ok) { @unlink($out); vbf_job_update_item($jobId, $name, 'error', $err); continue; }
 
         // Back up the TRUE original exactly once (video + its original thumbnail).
