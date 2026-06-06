@@ -73,6 +73,26 @@ function vbf_render_frame(string $src, string $dst, array $boxes, string $ffColo
     return [true, ''];
 }
 
+// Composite $src (optionally masked with $boxes) onto a $tw x $th canvas filled with
+// $canvasHex, placed at ($offx,$offy) — pads where the source is smaller and crops
+// where larger (overlay accepts negative offsets). Used to canonicalise dimensions
+// while keeping the person positioned. Returns [bool, err].
+function vbf_render_canvas(string $src, string $dst, array $boxes, string $ffColor,
+                          int $tw, int $th, int $offx, int $offy, string $canvasHex): array {
+    $dims = vbf_probe_dims($src);
+    if ($dims === null) return [false, "probe failed for $src"];
+    $chain = vbf_build_drawbox($boxes, $dims['w'], $dims['h'], $ffColor);
+    $fg = $chain === '' ? '[0:v]copy[fg]' : "[0:v]{$chain}[fg]";
+    $fc = "color=c={$canvasHex}:s={$tw}x{$th}[bg];{$fg};[bg][fg]overlay=x={$offx}:y={$offy}:shortest=1[v]";
+    $argv = ['ffmpeg', '-hide_banner', '-loglevel', 'error', '-y', '-i', $src,
+             '-filter_complex', $fc, '-map', '[v]', '-map', '0:a?',
+             '-c:v', 'libx264', '-crf', '18', '-preset', 'veryfast',
+             '-pix_fmt', 'yuv420p', '-c:a', 'copy', '-movflags', '+faststart', $dst];
+    [$code, , $err] = vbf_exec($argv);
+    if ($code !== 0) return [false, substr(trim($err), -2000)];
+    return [true, ''];
+}
+
 // Extract a representative thumbnail (middle frame) from $src to a JPG $dst.
 // Falls back to the first frame if the midpoint seek fails. Returns [bool, err].
 function vbf_extract_thumb(string $src, string $dst): array {

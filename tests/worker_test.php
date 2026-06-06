@@ -24,6 +24,8 @@ eq($done['items'][0]['status'], 'done', 'item marked done');
 ok(is_file("$backup/$name"), 'original backed up');
 ok(is_file("$post/$name"), 'live file present after replace');
 eq(filesize("$backup/$name"), $origSize, 'backup equals original size');
+// Fixture is 1440x1252 (off-spec) -> worker canonicalises it to the target canvas.
+eq(vbf_probe_dims("$post/$name"), ['w' => 1764, 'h' => 1534], 'normalized to target canvas');
 
 // Re-run a second job on same file: backup must NOT be overwritten (true original preserved).
 $backupSize1 = filesize("$backup/$name");
