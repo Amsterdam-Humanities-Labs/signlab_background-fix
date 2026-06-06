@@ -222,7 +222,11 @@ main { max-width: 1320px; margin: 0 auto; padding: 22px; display: flex; flex-dir
 .job-when { font-family: var(--mono); font-size: 11px; color: var(--muted); }
 .job-prog { font-family: var(--mono); font-size: 12px; }
 .job-counts { font-family: var(--mono); font-size: 12px; color: var(--muted); }
-.job-state { justify-self: end; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+.job-state { justify-self: end; display: flex; align-items: center; gap: 8px; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+.job-stop { text-transform: none; letter-spacing: 0; background: rgba(240,96,77,.14); border-color: rgba(240,96,77,.5); color: var(--bad); padding: 3px 9px; }
+.job-stop:hover { background: var(--bad); color: #06121d; border-color: var(--bad); }
+.job.job-cancelled { border-left-color: var(--muted); }
+.job.job-cancelled .job-label { color: var(--muted); }
 .job.job-active { border-left-color: var(--warn); background: linear-gradient(90deg, rgba(227,163,58,.08), var(--bg-elev) 40%); }
 .job.job-active .job-state { color: var(--warn); }
 .job.job-done  { border-left-color: var(--good); }

@@ -7,12 +7,14 @@ $id = $_GET['job'] ?? '';
 $job = vbf_job_read($id);
 if ($job === null) { http_response_code(404); echo json_encode(['error'=>'job not found']); exit; }
 
-$counts = ['queued'=>0,'processing'=>0,'done'=>0,'error'=>0];
+$counts = ['queued'=>0,'processing'=>0,'done'=>0,'error'=>0,'cancelled'=>0];
 foreach ($job['items'] as $it) { $counts[$it['status']] = ($counts[$it['status']] ?? 0) + 1; }
 $total = count($job['items']);
-$finished = $counts['done'] + $counts['error'];
+$finished = $counts['done'] + $counts['error'] + $counts['cancelled'];
+$cancelled = !empty($job['cancelled']);
 
 echo json_encode([
     'id' => $job['id'], 'total' => $total, 'finished' => $finished,
-    'counts' => $counts, 'complete' => $finished >= $total, 'items' => $job['items'],
+    'counts' => $counts, 'cancelled' => $cancelled,
+    'complete' => ($finished >= $total) || $cancelled, 'items' => $job['items'],
 ]);

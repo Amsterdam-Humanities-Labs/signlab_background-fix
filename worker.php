@@ -12,7 +12,16 @@ function vbf_worker_run(string $jobId): void {
     vbf_ensure_dir(vbf_tmp_dir());
     vbf_ensure_dir(vbf_backup_dir());
 
+    // Record our PID so the UI can stop us; bail out immediately if already cancelled.
+    $job['pid'] = getmypid();
+    if (!empty($job['cancelled'])) return;
+    vbf_job_write($job);
+
     foreach ($job['items'] as $item) {
+        // Stop promptly if the job was cancelled from the UI.
+        $live = vbf_job_read($jobId);
+        if ($live && !empty($live['cancelled'])) return;
+
         $name = $item['filename'];
         if (!in_array($item['status'], ['queued', 'error'], true)) continue;
         vbf_job_update_item($jobId, $name, 'processing', null);

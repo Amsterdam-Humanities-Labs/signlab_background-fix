@@ -19,6 +19,7 @@ const state = {
   jobs: [],             // last queue snapshot (for date filtering)
   bust: {},             // filename -> cache-bust token for thumbnails
   expandedJobs: new Set(), // queue rows currently expanded to show thumbnails
+  lastBatchIndex: null, // for shift-click range selection in the batch grid
 };
 
 // Media lives under the studio post dir (root-relative, host-agnostic).
@@ -229,6 +230,7 @@ async function previewVideo() {
 function renderBatch() {
   const wrap = $('#batch-list');
   wrap.innerHTML = '';
+  state.lastBatchIndex = null;
   visibleClips().forEach(({ rec, f }, n) => {     // same filename ordering as the takes grid
     const el = document.createElement('label');
     el.className = 'card bcard';
@@ -238,6 +240,17 @@ function renderBatch() {
       ${cardThumb(rec, f, f.filename)}
       ${cardBody(rec, f)}`;
     wrap.appendChild(el);
+  });
+  // Shift-click selects the whole range between the last click and this one (one go).
+  const boxes = [...wrap.querySelectorAll('input[type=checkbox]')];
+  boxes.forEach((cb, i) => {
+    cb.addEventListener('click', (e) => {
+      if (e.shiftKey && state.lastBatchIndex !== null) {
+        const a = Math.min(state.lastBatchIndex, i), b = Math.max(state.lastBatchIndex, i);
+        for (let k = a; k <= b; k++) boxes[k].checked = cb.checked;
+      }
+      state.lastBatchIndex = i;
+    });
   });
 }
 
@@ -368,10 +381,21 @@ async function loadJobs() {
     const data = await res.json();
     state.jobs = data.jobs || [];
     renderJobs();
-    // Keep refreshing while any job is still running.
+    // Keep refreshing while any job is still actively running (not complete/cancelled).
     clearTimeout(loadJobs._t);
-    if (state.jobs.some(j => !j.complete)) loadJobs._t = setTimeout(loadJobs, 1500);
+    if (state.jobs.some(j => !j.complete && !j.cancelled)) loadJobs._t = setTimeout(loadJobs, 1500);
   } catch (e) { /* leave previous render in place */ }
+}
+
+async function cancelJob(id, btn) {
+  if (!confirm('Stop this batch? Already-processed clips are kept; the rest are cancelled.')) return;
+  if (btn) { btn.disabled = true; btn.textContent = 'Stopping…'; }
+  try {
+    await fetch('api/cancel.php', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ job: id }) });
+    msg('Batch stopped');
+  } catch (e) { msg('Stop failed'); }
+  loadJobs();
 }
 
 // Render the queue, filtered to the currently selected date. Rows expand to a
@@ -387,9 +411,12 @@ function renderJobs() {
   }
   for (const j of jobs) {
     const when = String(j.created || '').replace('T', ' ').slice(0, 19);
-    const cls = !j.complete ? 'job-active' : (j.counts.error ? 'job-err' : 'job-done');
-    const label = !j.complete ? 'processing…'
-                : (j.counts.error ? `done, ${j.counts.error} error(s)` : 'done');
+    const active = !j.complete && !j.cancelled;
+    const cls = active ? 'job-active' : (j.cancelled ? 'job-cancelled' : (j.counts.error ? 'job-err' : 'job-done'));
+    const cn = j.counts.cancelled || 0;
+    const label = active ? 'processing…'
+                : (j.cancelled ? `stopped — ${j.counts.done} done` + (cn ? `, ${cn} cancelled` : '')
+                : (j.counts.error ? `done, ${j.counts.error} error(s)` : 'done'));
     const open = state.expandedJobs.has(j.id);
 
     const block = document.createElement('div');
@@ -400,7 +427,10 @@ function renderJobs() {
         <span class="job-when">${esc(when)}</span>
         <span class="job-prog">${j.finished}/${j.total}</span>
         <span class="job-counts">✓${j.counts.done} ✗${j.counts.error}</span>
-        <span class="job-state">${esc(label)}</span>
+        <span class="job-state">
+          <span class="job-label">${esc(label)}</span>
+          ${active ? '<button class="btn btn-sm job-stop">■ Stop</button>' : ''}
+        </span>
       </div>
       <div class="job-details"></div>`;
     const row = block.querySelector('.job');
@@ -414,6 +444,8 @@ function renderJobs() {
     };
     row.onclick = toggle;
     row.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } };
+    const stop = block.querySelector('.job-stop');
+    if (stop) stop.onclick = (e) => { e.stopPropagation(); cancelJob(j.id, stop); };
     if (open) loadJobItems(j.id, details);
     wrap.appendChild(block);
   }
