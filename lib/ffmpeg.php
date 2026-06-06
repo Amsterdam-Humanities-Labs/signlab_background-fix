@@ -81,18 +81,26 @@ function vbf_render_frame(string $src, string $dst, array $boxes, string $ffColo
     return [true, ''];
 }
 
-// Composite $src (optionally masked with $boxes) onto a $tw x $th canvas filled with
-// $canvasHex, placed at ($offx,$offy) — pads where the source is smaller and crops
-// where larger (overlay accepts negative offsets). Used to canonicalise dimensions
-// while keeping the person positioned. Returns [bool, err].
-function vbf_render_canvas(string $src, string $dst, array $boxes, string $ffColor,
-                          int $tw, int $th, int $offx, int $offy, string $canvasHex): array {
+// Build the filter_complex that masks (optional), crops black borders, and composites
+// the source onto a $tw x $th canvas of $canvasHex at ($offx,$offy). $crop is the
+// content rectangle in ORIGINAL pixels (drawbox runs first, in original coords).
+function vbf_canvas_fc(string $src, array $boxes, string $ffColor, int $tw, int $th,
+                       array $crop, int $offx, int $offy, string $canvasHex, ?string $fps): string {
     $dims = vbf_probe_dims($src);
-    if ($dims === null) return [false, "probe failed for $src"];
-    $chain = vbf_build_drawbox($boxes, $dims['w'], $dims['h'], $ffColor);
-    $fg = $chain === '' ? '[0:v]copy[fg]' : "[0:v]{$chain}[fg]";
+    $chain = $dims ? vbf_build_drawbox($boxes, $dims['w'], $dims['h'], $ffColor) : '';
+    $cropf = "crop={$crop['w']}:{$crop['h']}:{$crop['x']}:{$crop['y']}";
+    $pre = $chain === '' ? $cropf : "{$chain},{$cropf}";
+    $rate = $fps ? ":r={$fps}" : '';
+    return "color=c={$canvasHex}:s={$tw}x{$th}{$rate}[bg];[0:v]{$pre}[fg];"
+         . "[bg][fg]overlay=x={$offx}:y={$offy}:shortest=1[v]";
+}
+
+// Composite a (masked, border-cropped) source onto the canvas. Returns [bool, err].
+function vbf_render_canvas(string $src, string $dst, array $boxes, string $ffColor,
+                          int $tw, int $th, array $crop, int $offx, int $offy, string $canvasHex): array {
+    if (vbf_probe_dims($src) === null) return [false, "probe failed for $src"];
     $fps = vbf_probe_fps($src) ?: '25';   // keep canvas at source frame rate (else overlay forces 25)
-    $fc = "color=c={$canvasHex}:s={$tw}x{$th}:r={$fps}[bg];{$fg};[bg][fg]overlay=x={$offx}:y={$offy}:shortest=1[v]";
+    $fc = vbf_canvas_fc($src, $boxes, $ffColor, $tw, $th, $crop, $offx, $offy, $canvasHex, $fps);
     $argv = ['ffmpeg', '-hide_banner', '-loglevel', 'error', '-y', '-i', $src,
              '-filter_complex', $fc, '-map', '[v]', '-map', '0:a?',
              '-c:v', 'libx264', '-crf', '18', '-preset', 'veryfast',
@@ -102,48 +110,12 @@ function vbf_render_canvas(string $src, string $dst, array $boxes, string $ffCol
     return [true, ''];
 }
 
-// ---- Canonical canvas / normalization (shared by worker + preview) ----
-// Matches reference clip M20241209_9819. Off-spec clips are composited onto this
-// size with the person centred and head anchored.
-const VBF_TARGET_W = 1764;
-const VBF_TARGET_H = 1534;
-const VBF_TARGET_HEAD_TOP = 125;   // target y of head-top (≈8.15% of height, from reference)
-
-function vbf_needs_norm(array $dims): bool {
-    return $dims['w'] != VBF_TARGET_W || $dims['h'] != VBF_TARGET_H;
-}
-
-// Detect person centre + head-top (source px) via lib/detect_center.py.
-// Returns ['cx'=>float,'head_top'=>float] or null on failure.
-function vbf_detect_center(string $src): ?array {
-    [$code, $out] = vbf_exec(['python3', __DIR__ . '/detect_center.py', $src]);
-    if ($code !== 0) return null;
-    $info = json_decode(trim($out), true);
-    if (!is_array($info) || empty($info['ok'])) return null;
-    return ['cx' => (float) $info['cx'], 'head_top' => (float) $info['head_top']];
-}
-
-// Overlay offsets that centre the person horizontally and anchor the head; falls
-// back to plain centring if detection fails.
-function vbf_norm_offsets(string $src, array $dims): array {
-    $c = vbf_detect_center($src);
-    if ($c !== null) {
-        return [(int) round(VBF_TARGET_W / 2 - $c['cx']),
-                (int) round(VBF_TARGET_HEAD_TOP - $c['head_top'])];
-    }
-    return [(int) round((VBF_TARGET_W - $dims['w']) / 2),
-            (int) round((VBF_TARGET_H - $dims['h']) / 2)];
-}
-
-// Single-frame variant of vbf_render_canvas (outputs one frame, e.g. a PNG).
+// Single-frame variant (outputs one frame, e.g. a PNG).
 function vbf_render_canvas_frame(string $src, string $dst, array $boxes, string $ffColor,
-                                int $tw, int $th, int $offx, int $offy, string $canvasHex,
-                                float $at = 0.0): array {
-    $dims = vbf_probe_dims($src);
-    if ($dims === null) return [false, "probe failed for $src"];
-    $chain = vbf_build_drawbox($boxes, $dims['w'], $dims['h'], $ffColor);
-    $fg = $chain === '' ? '[0:v]copy[fg]' : "[0:v]{$chain}[fg]";
-    $fc = "color=c={$canvasHex}:s={$tw}x{$th}[bg];{$fg};[bg][fg]overlay=x={$offx}:y={$offy}[v]";
+                                int $tw, int $th, array $crop, int $offx, int $offy,
+                                string $canvasHex, float $at = 0.0): array {
+    if (vbf_probe_dims($src) === null) return [false, "probe failed for $src"];
+    $fc = vbf_canvas_fc($src, $boxes, $ffColor, $tw, $th, $crop, $offx, $offy, $canvasHex, null);
     $argv = ['ffmpeg', '-hide_banner', '-loglevel', 'error', '-y', '-ss', (string) $at, '-i', $src,
              '-filter_complex', $fc, '-map', '[v]', '-frames:v', '1', $dst];
     [$code, , $err] = vbf_exec($argv);
@@ -151,14 +123,50 @@ function vbf_render_canvas_frame(string $src, string $dst, array $boxes, string 
     return [true, ''];
 }
 
+// ---- Canonical canvas / normalization (shared by worker + preview) ----
+// Matches reference clip M20241209_9819 (1764x1534). Off-spec clips are border-cropped
+// (removes black auto-crop wedges) then composited with the person centred and the
+// eyes anchored VBF_TARGET_EYE_Y px from the top.
+const VBF_TARGET_W = 1764;
+const VBF_TARGET_H = 1534;
+const VBF_TARGET_EYE_Y = 200;   // desired margin between eyes and top of frame
+
+function vbf_needs_norm(array $dims): bool {
+    return $dims['w'] != VBF_TARGET_W || $dims['h'] != VBF_TARGET_H;
+}
+
+// Run lib/detect_center.py -> ['cx'=>float,'eye_y'=>float,'crop'=>[x,y,w,h]] or null.
+// cx/eye_y are in CROPPED coordinates.
+function vbf_detect_center(string $src): ?array {
+    [$code, $out] = vbf_exec(['python3', __DIR__ . '/detect_center.py', $src]);
+    if ($code !== 0) return null;
+    $i = json_decode(trim($out), true);
+    if (!is_array($i) || empty($i['ok']) || !isset($i['crop'])) return null;
+    return ['cx' => (float) $i['cx'], 'eye_y' => (float) $i['eye_y'], 'crop' => $i['crop']];
+}
+
+// Plan: crop rectangle + overlay offsets (centre person, anchor eyes). Falls back to
+// no-crop plain centring if detection fails.
+function vbf_norm_plan(string $src, array $dims): array {
+    $d = vbf_detect_center($src);
+    if ($d !== null) {
+        return ['crop' => $d['crop'],
+                'offx' => (int) round(VBF_TARGET_W / 2 - $d['cx']),
+                'offy' => (int) round(VBF_TARGET_EYE_Y - $d['eye_y'])];
+    }
+    return ['crop' => ['x' => 0, 'y' => 0, 'w' => $dims['w'], 'h' => $dims['h']],
+            'offx' => (int) round((VBF_TARGET_W - $dims['w']) / 2),
+            'offy' => (int) round((VBF_TARGET_H - $dims['h']) / 2)];
+}
+
 // Unified video fix = mask + normalize-if-off-spec. Used by worker AND preview.
 function vbf_process_video(string $src, string $dst, array $boxes, string $ffColor): array {
     $dims = vbf_probe_dims($src);
     if ($dims === null) return [false, "probe failed for $src"];
     if (vbf_needs_norm($dims)) {
-        [$ox, $oy] = vbf_norm_offsets($src, $dims);
+        $p = vbf_norm_plan($src, $dims);
         return vbf_render_canvas($src, $dst, $boxes, $ffColor,
-                   VBF_TARGET_W, VBF_TARGET_H, $ox, $oy, $ffColor);
+                   VBF_TARGET_W, VBF_TARGET_H, $p['crop'], $p['offx'], $p['offy'], $ffColor);
     }
     return vbf_render($src, $dst, $boxes, $ffColor);
 }
@@ -168,9 +176,9 @@ function vbf_process_frame(string $src, string $dst, array $boxes, string $ffCol
     $dims = vbf_probe_dims($src);
     if ($dims === null) return [false, "probe failed for $src"];
     if (vbf_needs_norm($dims)) {
-        [$ox, $oy] = vbf_norm_offsets($src, $dims);
+        $p = vbf_norm_plan($src, $dims);
         return vbf_render_canvas_frame($src, $dst, $boxes, $ffColor,
-                   VBF_TARGET_W, VBF_TARGET_H, $ox, $oy, $ffColor, $at);
+                   VBF_TARGET_W, VBF_TARGET_H, $p['crop'], $p['offx'], $p['offy'], $ffColor, $at);
     }
     return vbf_render_frame($src, $dst, $boxes, $ffColor, $at);
 }
