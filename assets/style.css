@@ -202,10 +202,18 @@ main { max-width: 1320px; margin: 0 auto; padding: 22px; display: flex; flex-dir
 #queue { display: flex; flex-direction: column; gap: 6px; max-height: 32vh; overflow: auto; }
 .muted { color: var(--muted); font-size: 13px; }
 .job {
-  display: grid; grid-template-columns: 88px 158px 64px 96px 1fr; gap: 12px; align-items: center;
-  font-size: 12.5px; padding: 9px 13px; border-radius: 9px;
+  display: grid; grid-template-columns: 18px 88px 158px 64px 96px 1fr; gap: 12px; align-items: center;
+  font-size: 12.5px; padding: 9px 13px; border-radius: 9px; cursor: pointer;
   background: var(--bg-elev); border: 1px solid var(--line-soft); border-left: 3px solid var(--faint);
 }
+.job:hover { border-color: #3a4655; }
+.job-exp { color: var(--muted); font-size: 11px; }
+.job-details:not(:empty) { padding: 4px 2px 8px; }
+.grid.job-items { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.card.mini .card-body { padding: 7px 9px 9px; }
+.card.mini .card-file { font-size: 10px; }
+.card-err { font-family: var(--mono); font-size: 10px; color: var(--bad); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card.mini .pstat { display: inline-block; }
 .job-date { font-family: var(--disp); font-weight: 700; }
 .job-when { font-family: var(--mono); font-size: 11px; color: var(--muted); }
 .job-prog { font-family: var(--mono); font-size: 12px; }

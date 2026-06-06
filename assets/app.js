@@ -20,7 +20,21 @@ const state = {
   videoApproved: false,
   jobs: [],             // last queue snapshot (for date filtering)
   bust: {},             // filename -> cache-bust token for thumbnails
+  expandedJobs: new Set(), // queue rows currently expanded to show thumbnails
 };
+
+// Media lives under the studio post dir (root-relative, host-agnostic).
+const MEDIA_POST = '/gebarenoverleg_media/studioFilesMini/post/';
+function postUrl(filename) { return MEDIA_POST + filename; }
+function thumbForName(filename) {
+  const u = postUrl(filename).replace(/\.mp4$/i, '.jpg');
+  const t = state.bust[filename];
+  return t ? u + '?t=' + t : u;
+}
+function viewByName(filename) {
+  openModal(filename + ' — fixed',
+    `<video src="${esc(postUrl(filename))}?t=${Date.now()}" controls autoplay loop></video>`);
+}
 
 function msg(text) { $('#status-msg').textContent = text; }
 
@@ -346,12 +360,7 @@ function openModal(title, bodyHtml) {
 }
 function closeModal() { $('#modal').hidden = true; $('#modal-body').innerHTML = ''; }
 
-function viewResult(filename) {
-  const f = fileByName(filename);
-  if (!f || !f.view_url) return;
-  const bust = f.view_url + '?t=' + Date.now();   // bypass cache -> show the fixed file
-  openModal(filename + ' — fixed', `<video src="${esc(bust)}" controls autoplay loop></video>`);
-}
+function viewResult(filename) { viewByName(filename); }
 
 // ---- Date dropdown ----
 async function loadDates() {
@@ -382,28 +391,78 @@ async function loadJobs() {
   } catch (e) { /* leave previous render in place */ }
 }
 
-// Render the queue, filtered to the currently selected date.
+// Render the queue, filtered to the currently selected date. Rows expand to a
+// thumbnail grid of their clips so they can be checked individually.
 function renderJobs() {
   const wrap = $('#queue');
   const date = $('#date').value;
   const jobs = date ? state.jobs.filter(j => j.date === date) : state.jobs;
+  wrap.innerHTML = '';
   if (!jobs.length) {
     wrap.innerHTML = `<p class="muted">No batches${date ? ' for ' + esc(date) : ''} yet.</p>`;
     return;
   }
-  wrap.innerHTML = jobs.map(j => {
+  for (const j of jobs) {
     const when = String(j.created || '').replace('T', ' ').slice(0, 19);
     const cls = !j.complete ? 'job-active' : (j.counts.error ? 'job-err' : 'job-done');
     const label = !j.complete ? 'processing…'
                 : (j.counts.error ? `done, ${j.counts.error} error(s)` : 'done');
-    return `<div class="job ${cls}">
-      <span class="job-date">${esc(j.date)}</span>
-      <span class="job-when">${esc(when)}</span>
-      <span class="job-prog">${j.finished}/${j.total}</span>
-      <span class="job-counts">✓${j.counts.done} ✗${j.counts.error}</span>
-      <span class="job-state">${esc(label)}</span>
-    </div>`;
-  }).join('');
+    const open = state.expandedJobs.has(j.id);
+
+    const block = document.createElement('div');
+    block.className = 'job-block';
+    block.innerHTML = `<div class="job ${cls}" role="button" tabindex="0">
+        <span class="job-exp">${open ? '▾' : '▸'}</span>
+        <span class="job-date">${esc(j.date)}</span>
+        <span class="job-when">${esc(when)}</span>
+        <span class="job-prog">${j.finished}/${j.total}</span>
+        <span class="job-counts">✓${j.counts.done} ✗${j.counts.error}</span>
+        <span class="job-state">${esc(label)}</span>
+      </div>
+      <div class="job-details"></div>`;
+    const row = block.querySelector('.job');
+    const details = block.querySelector('.job-details');
+    const toggle = () => {
+      if (state.expandedJobs.has(j.id)) {
+        state.expandedJobs.delete(j.id); details.innerHTML = ''; row.querySelector('.job-exp').textContent = '▸';
+      } else {
+        state.expandedJobs.add(j.id); row.querySelector('.job-exp').textContent = '▾'; loadJobItems(j.id, details);
+      }
+    };
+    row.onclick = toggle;
+    row.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } };
+    if (open) loadJobItems(j.id, details);
+    wrap.appendChild(block);
+  }
+}
+
+// Fetch a job's per-file items and render them as a thumbnail grid.
+async function loadJobItems(id, container) {
+  container.innerHTML = '<p class="muted">Loading clips…</p>';
+  let data;
+  try {
+    const res = await fetch('api/status.php?job=' + encodeURIComponent(id));
+    data = await res.json();
+  } catch (e) { container.innerHTML = '<p class="muted">Failed to load clips</p>'; return; }
+  if (!data || data.error) { container.innerHTML = `<p class="muted">${esc(data && data.error || 'error')}</p>`; return; }
+
+  container.innerHTML = '';
+  const grid = document.createElement('div');
+  grid.className = 'grid job-items';
+  for (const it of data.items) {
+    const c = document.createElement('div');
+    c.className = 'card mini' + (it.status === 'done' ? ' done-card' : '');
+    c.innerHTML = `<div class="card-thumb">
+        <span class="noimg-fallback">no thumbnail</span>
+        <img class="thumb" src="${esc(thumbForName(it.filename))}" loading="lazy" alt="" onerror="this.classList.add('noimg')">
+        <span class="pstat ${esc(it.status)}">${esc(it.status)}</span>
+      </div>
+      <div class="card-body"><span class="card-file">${esc(it.filename)}</span>
+        ${it.error ? `<span class="card-err">${esc(it.error)}</span>` : ''}</div>`;
+    if (it.status === 'done') c.onclick = () => viewByName(it.filename);
+    grid.appendChild(c);
+  }
+  container.appendChild(grid);
 }
 
 // ---- Wire up ----
