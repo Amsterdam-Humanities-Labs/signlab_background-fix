@@ -129,30 +129,30 @@ function vbf_render_canvas_frame(string $src, string $dst, array $boxes, string 
 // eyes anchored VBF_TARGET_EYE_Y px from the top.
 const VBF_TARGET_W = 1764;
 const VBF_TARGET_H = 1534;
-const VBF_TARGET_EYE_Y = 200;   // desired margin between eyes and top of frame
+const VBF_TARGET_HEAD_TOP = 200;   // desired margin between top of head and top of frame
 
 function vbf_needs_norm(array $dims): bool {
     return $dims['w'] != VBF_TARGET_W || $dims['h'] != VBF_TARGET_H;
 }
 
-// Run lib/detect_center.py -> ['cx'=>float,'eye_y'=>float,'crop'=>[x,y,w,h]] or null.
-// cx/eye_y are in CROPPED coordinates.
+// Run lib/detect_center.py -> ['cx'=>float,'head_top'=>float,'crop'=>[x,y,w,h]] or null.
+// cx/head_top are in CROPPED coordinates.
 function vbf_detect_center(string $src): ?array {
     [$code, $out] = vbf_exec(['python3', __DIR__ . '/detect_center.py', $src]);
     if ($code !== 0) return null;
     $i = json_decode(trim($out), true);
     if (!is_array($i) || empty($i['ok']) || !isset($i['crop'])) return null;
-    return ['cx' => (float) $i['cx'], 'eye_y' => (float) $i['eye_y'], 'crop' => $i['crop']];
+    return ['cx' => (float) $i['cx'], 'head_top' => (float) $i['head_top'], 'crop' => $i['crop']];
 }
 
-// Plan: crop rectangle + overlay offsets (centre person, anchor eyes). Falls back to
-// no-crop plain centring if detection fails.
+// Plan: crop rectangle + overlay offsets (centre person, anchor top-of-head). Falls
+// back to no-crop plain centring if detection fails.
 function vbf_norm_plan(string $src, array $dims): array {
     $d = vbf_detect_center($src);
     if ($d !== null) {
         return ['crop' => $d['crop'],
                 'offx' => (int) round(VBF_TARGET_W / 2 - $d['cx']),
-                'offy' => (int) round(VBF_TARGET_EYE_Y - $d['eye_y'])];
+                'offy' => (int) round(VBF_TARGET_HEAD_TOP - $d['head_top'])];
     }
     return ['crop' => ['x' => 0, 'y' => 0, 'w' => $dims['w'], 'h' => $dims['h']],
             'offx' => (int) round((VBF_TARGET_W - $dims['w']) / 2),
