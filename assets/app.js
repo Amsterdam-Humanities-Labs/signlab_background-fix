@@ -41,31 +41,44 @@ function camFilter() { return $('#camera').value; }
 // Thumbnails live next to the video: same URL with .mp4 -> .jpg.
 function thumbUrl(f) { return (f.view_url || '').replace(/\.mp4$/i, '.jpg'); }
 
+// Shared card pieces ------------------------------------------------
+function cardThumb(rec, f, pstatFile) {
+  return `<div class="card-thumb">
+      <span class="cam-badge">${esc(f.camera)}</span>
+      ${f.already_fixed ? '<span class="fixed-badge">fixed</span>' : ''}
+      <span class="noimg-fallback">no thumbnail</span>
+      <img class="thumb" src="${esc(thumbUrl(f))}" loading="lazy" alt="" onerror="this.classList.add('noimg')">
+      ${pstatFile ? `<span class="pstat" data-file="${esc(pstatFile)}"></span>` : ''}
+    </div>`;
+}
+function cardBody(rec, f) {
+  const gloss = rec.glos || rec.m_transcription || '';
+  return `<div class="card-body">
+      <span class="card-id">#${esc(rec.id)}</span>
+      ${gloss ? `<span class="card-gloss">${esc(gloss)}</span>` : ''}
+      <span class="card-file">${esc(f.filename)}</span>
+    </div>`;
+}
+
 function renderList() {
   const cam = camFilter();
   const wrap = $('#list');
   wrap.innerHTML = '';
+  let n = 0;
   for (const rec of state.records) {
-    const files = (rec.files || []).filter(f => f.local && (!cam || f.camera === cam));
-    if (files.length === 0) continue;
-    const div = document.createElement('div');
-    div.className = 'take';
-    div.innerHTML = `<h4>#${esc(rec.id)} — ${esc(rec.glos || rec.m_transcription || '')}</h4>`;
-    for (const f of files) {
-      const row = document.createElement('div');
-      row.className = 'file';
-      const fixed = f.already_fixed ? '<span class="badge fixed">fixed</span>' : '';
-      row.innerHTML = `<img class="thumb" src="${esc(thumbUrl(f))}" loading="lazy" alt="" onerror="this.classList.add('noimg')">
-        <span class="badge">${esc(f.camera)}</span>
-        <span class="fname">${esc(f.filename)}</span> ${fixed}`;
-      const btn = document.createElement('button');
-      btn.textContent = 'Edit';
-      btn.onclick = () => openEditor(f);
-      row.appendChild(btn);
-      div.appendChild(row);
+    for (const f of (rec.files || [])) {
+      if (!f.local || (cam && f.camera !== cam)) continue;
+      const el = document.createElement('div');
+      el.className = 'card';
+      el.style.animationDelay = Math.min(n * 18, 400) + 'ms';
+      el.innerHTML = cardThumb(rec, f) + `<span class="card-cta">Edit ✎</span>` + cardBody(rec, f);
+      el.onclick = () => openEditor(f);
+      wrap.appendChild(el);
+      n++;
     }
-    wrap.appendChild(div);
   }
+  $('#list-count').textContent = n ? `${n} clips` : '';
+  if (!n) wrap.innerHTML = '<p class="muted">No local clips for this date / camera.</p>';
 }
 
 // ---- Editor ----
@@ -199,17 +212,19 @@ function renderBatch() {
   const cam = camFilter();
   const wrap = $('#batch-list');
   wrap.innerHTML = '';
+  let n = 0;
   for (const rec of state.records) {
     for (const f of (rec.files || [])) {
       if (!f.local || (cam && f.camera !== cam)) continue;
-      const row = document.createElement('label');
-      row.className = 'batch-row';
-      row.innerHTML = `<input type="checkbox" value="${esc(f.filename)}">
-        <img class="thumb" src="${esc(thumbUrl(f))}" loading="lazy" alt="" onerror="this.classList.add('noimg')">
-        <span class="badge">${esc(f.camera)}</span> <span class="fname">${esc(f.filename)}</span>
-        ${f.already_fixed ? '<span class="badge fixed">fixed</span>' : ''}
-        <span class="pstat" data-file="${esc(f.filename)}"></span>`;
-      wrap.appendChild(row);
+      const el = document.createElement('label');
+      el.className = 'card bcard';
+      el.style.animationDelay = Math.min(n * 18, 400) + 'ms';
+      el.innerHTML = `<input type="checkbox" value="${esc(f.filename)}">
+        <span class="check">✓</span>
+        ${cardThumb(rec, f, f.filename)}
+        ${cardBody(rec, f)}`;
+      wrap.appendChild(el);
+      n++;
     }
   }
 }

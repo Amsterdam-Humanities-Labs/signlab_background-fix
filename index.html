@@ -3,38 +3,67 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Video Background Fix</title>
+  <title>Background Fix · Studio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="assets/style.css">
 </head>
 <body>
-  <header>
-    <h1>Video Background Fix</h1>
+  <header class="appbar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <div class="brand-text">
+        <span class="brand-title">Background&nbsp;Fix</span>
+        <span class="brand-sub">studio mask tool</span>
+      </div>
+    </div>
     <div class="toolbar">
-      <select id="date"><option value="">Loading dates…</option></select>
-      <select id="camera"><option value="">All cameras</option>
-        <option>L</option><option>M</option><option>R</option><option>A</option><option>B</option></select>
-      <button id="load">Load</button>
-      <span id="status-msg"></span>
+      <label class="field">
+        <span>Date</span>
+        <select id="date"><option value="">loading…</option></select>
+      </label>
+      <label class="field">
+        <span>Camera</span>
+        <select id="camera">
+          <option value="">all</option>
+          <option>L</option><option>M</option><option>R</option><option>A</option><option>B</option>
+        </select>
+      </label>
+      <button id="load" class="btn btn-accent">Load takes</button>
+      <span id="status-msg" class="status-msg"></span>
     </div>
   </header>
 
   <main>
-    <section id="queue-pane">
-      <h2>Queue / History <button id="refresh-queue" class="small">Refresh</button></h2>
+    <section id="queue-pane" class="panel">
+      <div class="panel-head">
+        <h2>Queue&nbsp;/&nbsp;History</h2>
+        <button id="refresh-queue" class="btn btn-ghost btn-sm">↻ Refresh</button>
+      </div>
       <div id="queue"></div>
     </section>
 
-    <section id="list-pane"><h2>Takes</h2><div id="list"></div></section>
-
-    <section id="edit-pane" hidden>
-      <h2>Editor — <span id="edit-name"></span></h2>
-      <div class="editor-controls">
-        <span class="label">Fill: studio background</span>
-        <button id="clear-boxes">Clear boxes</button>
-        <button id="preview-frame">Preview frame</button>
-        <button id="preview-video">Preview video</button>
-        <span id="box-count">0 boxes</span>
+    <section id="list-pane" class="panel">
+      <div class="panel-head">
+        <h2>Takes</h2>
+        <span id="list-count" class="count"></span>
       </div>
+      <div id="list" class="grid"></div>
+    </section>
+
+    <section id="edit-pane" class="panel" hidden>
+      <div class="panel-head">
+        <h2>Editor — <span id="edit-name" class="mono"></span></h2>
+        <span id="box-count" class="count">0 boxes</span>
+      </div>
+      <div class="editor-controls">
+        <span class="fill-chip"><span class="fill-swatch"></span> Fill: studio background</span>
+        <button id="clear-boxes" class="btn btn-ghost btn-sm">Clear boxes</button>
+        <button id="preview-frame" class="btn btn-sm">1 · Preview frame</button>
+        <button id="preview-video" class="btn btn-sm">2 · Preview video</button>
+      </div>
+      <p class="hint">Drag on the frame to draw mask boxes. Drag past the edge to fill a corner cleanly.</p>
       <div class="stage">
         <video id="video" controls crossorigin="anonymous"></video>
         <canvas id="canvas"></canvas>
@@ -42,15 +71,17 @@
       <div id="preview-out"></div>
     </section>
 
-    <section id="batch-pane" hidden>
-      <h2>Batch</h2>
-      <p>Boxes defined on the reference clip apply to every checked file below.</p>
-      <div class="batch-controls">
-        <button id="select-cam">Select all (current camera filter)</button>
-        <button id="run-batch">Process selected</button>
+    <section id="batch-pane" class="panel" hidden>
+      <div class="panel-head">
+        <h2>Batch</h2>
+        <div class="batch-controls">
+          <button id="select-cam" class="btn btn-ghost btn-sm">Select all shown</button>
+          <button id="run-batch" class="btn btn-accent btn-sm">Process selected →</button>
+        </div>
       </div>
-      <div id="batch-list"></div>
-      <div id="progress"></div>
+      <p class="hint">The boxes you defined apply to every selected clip. Click cards to select.</p>
+      <div id="progress" class="progress-line"></div>
+      <div id="batch-list" class="grid"></div>
     </section>
   </main>
 
