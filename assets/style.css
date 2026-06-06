@@ -25,3 +25,24 @@ main { display: grid; grid-template-columns: 320px 1fr; gap: 16px; padding: 16px
 .pstat.done { color: #1a7f37; } .pstat.error { color: #b00; } .pstat.processing { color: #b36b00; }
 #preview-out img, #preview-out video { max-width: 100%; border: 2px solid #0b1f3a; margin-top: 8px; }
 .row-actions { margin-top: 8px; display: flex; gap: 8px; }
+
+/* Thumbnails in takes + batch lists */
+.thumb { width: 64px; height: 56px; object-fit: cover; border-radius: 3px; background: #e8e8e8; flex: 0 0 auto; }
+.thumb.noimg { visibility: hidden; }
+.file { gap: 8px; }
+.fname { flex: 1 1 auto; }
+.file .fname, .batch-row .fname { font-variant-numeric: tabular-nums; }
+
+/* Queue / history */
+#queue-pane { grid-column: 1 / -1; }
+#queue-pane h2 { display: flex; align-items: center; gap: 10px; }
+button.small { font-size: 11px; padding: 2px 8px; }
+#queue { display: flex; flex-direction: column; gap: 3px; max-height: 30vh; overflow: auto; }
+.job { display: grid; grid-template-columns: 90px 150px 60px 90px 1fr; gap: 10px; align-items: center;
+       font-size: 12px; padding: 4px 8px; border-radius: 4px; border-left: 4px solid #bbb; background: #f5f5f5; }
+.job-date { font-weight: 600; }
+.job-when { color: #666; }
+.job.job-active { border-left-color: #b36b00; background: #fff6e8; }
+.job.job-done   { border-left-color: #1a7f37; }
+.job.job-err    { border-left-color: #b00; background: #fde8e8; }
+.muted { color: #888; font-size: 13px; }

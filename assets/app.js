@@ -38,6 +38,9 @@ async function loadDate() {
 
 function camFilter() { return $('#camera').value; }
 
+// Thumbnails live next to the video: same URL with .mp4 -> .jpg.
+function thumbUrl(f) { return (f.view_url || '').replace(/\.mp4$/i, '.jpg'); }
+
 function renderList() {
   const cam = camFilter();
   const wrap = $('#list');
@@ -52,8 +55,9 @@ function renderList() {
       const row = document.createElement('div');
       row.className = 'file';
       const fixed = f.already_fixed ? '<span class="badge fixed">fixed</span>' : '';
-      row.innerHTML = `<span class="badge">${esc(f.camera)}</span>
-        <span>${esc(f.filename)}</span> ${fixed}`;
+      row.innerHTML = `<img class="thumb" src="${esc(thumbUrl(f))}" loading="lazy" alt="" onerror="this.classList.add('noimg')">
+        <span class="badge">${esc(f.camera)}</span>
+        <span class="fname">${esc(f.filename)}</span> ${fixed}`;
       const btn = document.createElement('button');
       btn.textContent = 'Edit';
       btn.onclick = () => openEditor(f);
@@ -201,7 +205,8 @@ function renderBatch() {
       const row = document.createElement('label');
       row.className = 'batch-row';
       row.innerHTML = `<input type="checkbox" value="${esc(f.filename)}">
-        <span class="badge">${esc(f.camera)}</span> ${esc(f.filename)}
+        <img class="thumb" src="${esc(thumbUrl(f))}" loading="lazy" alt="" onerror="this.classList.add('noimg')">
+        <span class="badge">${esc(f.camera)}</span> <span class="fname">${esc(f.filename)}</span>
         ${f.already_fixed ? '<span class="badge fixed">fixed</span>' : ''}
         <span class="pstat" data-file="${esc(f.filename)}"></span>`;
       wrap.appendChild(row);
@@ -228,6 +233,7 @@ async function runBatch() {
   });
   const data = await res.json();
   if (data.error) { msg('Batch error: ' + data.error); return; }
+  loadJobs();          // surface the new job in the queue immediately
   pollStatus(data.job);
 }
 
@@ -242,7 +248,7 @@ async function pollStatus(jobId) {
     if (el) { el.textContent = it.status; el.className = 'pstat ' + it.status; }
   }
   if (!data.complete) { setTimeout(() => pollStatus(jobId), 1500); }
-  else { msg(`Batch complete: ${data.counts.done} done, ${data.counts.error} error`); }
+  else { msg(`Batch complete: ${data.counts.done} done, ${data.counts.error} error`); loadJobs(); }
 }
 
 // ---- Date dropdown ----
@@ -261,8 +267,40 @@ async function loadDates() {
   }
 }
 
+// ---- Queue / history (persists across logins via jobs/*.json) ----
+async function loadJobs() {
+  try {
+    const res = await fetch('api/jobs.php');
+    const data = await res.json();
+    const jobs = data.jobs || [];
+    renderJobs(jobs);
+    // Keep refreshing while any job is still running.
+    clearTimeout(loadJobs._t);
+    if (jobs.some(j => !j.complete)) loadJobs._t = setTimeout(loadJobs, 1500);
+  } catch (e) { /* leave previous render in place */ }
+}
+
+function renderJobs(jobs) {
+  const wrap = $('#queue');
+  if (!jobs.length) { wrap.innerHTML = '<p class="muted">No batches yet.</p>'; return; }
+  wrap.innerHTML = jobs.map(j => {
+    const when = String(j.created || '').replace('T', ' ').slice(0, 19);
+    const cls = !j.complete ? 'job-active' : (j.counts.error ? 'job-err' : 'job-done');
+    const label = !j.complete ? 'processing…'
+                : (j.counts.error ? `done, ${j.counts.error} error(s)` : 'done');
+    return `<div class="job ${cls}">
+      <span class="job-date">${esc(j.date)}</span>
+      <span class="job-when">${esc(when)}</span>
+      <span class="job-prog">${j.finished}/${j.total}</span>
+      <span class="job-counts">✓${j.counts.done} ✗${j.counts.error}</span>
+      <span class="job-state">${esc(label)}</span>
+    </div>`;
+  }).join('');
+}
+
 // ---- Wire up ----
 $('#load').onclick = loadDate;
+$('#refresh-queue').onclick = loadJobs;
 $('#camera').onchange = () => { renderList(); renderBatch(); };
 $('#clear-boxes').onclick = () => { state.boxes = []; state.frameApproved = false; state.videoApproved = false; updateBoxCount(); redraw(); };
 $('#preview-frame').onclick = previewFrame;
@@ -270,5 +308,6 @@ $('#preview-video').onclick = previewVideo;
 $('#select-cam').onclick = () => document.querySelectorAll('#batch-list input').forEach(c => c.checked = true);
 $('#run-batch').onclick = runBatch;
 
-// Populate the date dropdown on startup.
+// Populate the date dropdown and queue/history on startup.
 loadDates();
+loadJobs();
