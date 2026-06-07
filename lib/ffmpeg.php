@@ -81,26 +81,57 @@ function vbf_render_frame(string $src, string $dst, array $boxes, string $ffColo
     return [true, ''];
 }
 
-// Build the filter_complex that masks (optional), crops black borders, and composites
-// the source onto a $tw x $th canvas of $canvasHex at ($offx,$offy). $crop is the
-// content rectangle in ORIGINAL pixels (drawbox runs first, in original coords).
-function vbf_canvas_fc(string $src, array $boxes, string $ffColor, int $tw, int $th,
-                       array $crop, int $offx, int $offy, string $canvasHex, ?string $fps): string {
-    $dims = vbf_probe_dims($src);
-    $chain = $dims ? vbf_build_drawbox($boxes, $dims['w'], $dims['h'], $ffColor) : '';
-    $cropf = "crop={$crop['w']}:{$crop['h']}:{$crop['x']}:{$crop['y']}";
-    $pre = $chain === '' ? $cropf : "{$chain},{$cropf}";
-    $rate = $fps ? ":r={$fps}" : '';
-    return "color=c={$canvasHex}:s={$tw}x{$th}{$rate}[bg];[0:v]{$pre}[fg];"
-         . "[bg][fg]overlay=x={$offx}:y={$offy}:shortest=1[v]";
+// ---- Widen to 1.15:1 (shared by worker + preview) ----
+// Each clip is padded LEFT/RIGHT ONLY with studio blue until W:H = 1.15, with the
+// person horizontally centred. Vertical is untouched (no top/bottom change, no scaling).
+// Left/right black edge borders are trimmed first (so they don't show or skew centring).
+const VBF_TARGET_RATIO = 1.15;
+
+// Even target width for a given height.
+function vbf_target_w(int $h): int { $w = (int) round(VBF_TARGET_RATIO * $h); return $w + ($w % 2); }
+
+// True if the clip's aspect ratio isn't already ~1.15:1 (needs widening).
+function vbf_needs_norm(array $dims): bool {
+    return abs($dims['w'] / $dims['h'] - VBF_TARGET_RATIO) > 0.005;
 }
 
-// Composite a (masked, border-cropped) source onto the canvas. Returns [bool, err].
-function vbf_render_canvas(string $src, string $dst, array $boxes, string $ffColor,
-                          int $tw, int $th, array $crop, int $offx, int $offy, string $canvasHex): array {
-    if (vbf_probe_dims($src) === null) return [false, "probe failed for $src"];
-    $fps = vbf_probe_fps($src) ?: '25';   // keep canvas at source frame rate (else overlay forces 25)
-    $fc = vbf_canvas_fc($src, $boxes, $ffColor, $tw, $th, $crop, $offx, $offy, $canvasHex, $fps);
+// Run lib/detect_center.py -> ['crop_x','crop_w','cx'] (cropped coords) or null.
+function vbf_detect_center(string $src): ?array {
+    [$code, $out] = vbf_exec(['python3', __DIR__ . '/detect_center.py', $src]);
+    if ($code !== 0) return null;
+    $i = json_decode(trim($out), true);
+    if (!is_array($i) || empty($i['ok'])) return null;
+    return ['crop_x' => (int) $i['crop_x'], 'crop_w' => (int) $i['crop_w'], 'cx' => (float) $i['cx']];
+}
+
+// Plan the widen: left/right crop, target width, and left pad to centre the person.
+function vbf_widen_plan(string $src, array $dims): array {
+    $d = vbf_detect_center($src);
+    $cropX = $d ? $d['crop_x'] : 0;
+    $cropW = $d ? $d['crop_w'] : $dims['w'];
+    $cx    = $d ? $d['cx'] : $cropW / 2;
+    $tw = max(vbf_target_w($dims['h']), $cropW + ($cropW % 2));   // never shrink below content
+    $left = (int) round($tw / 2 - $cx);
+    $left = max(0, min($left, $tw - $cropW));                     // keep content on-canvas
+    return ['crop_x' => $cropX, 'crop_w' => $cropW, 'target_w' => $tw, 'left' => $left];
+}
+
+// filter_complex: optional mask (orig coords) -> crop L/R -> overlay on blue canvas.
+function vbf_widen_fc(string $src, array $boxes, string $ffColor, int $h, array $p,
+                      string $canvasHex, ?string $fps): string {
+    $dims = vbf_probe_dims($src);
+    $chain = $dims ? vbf_build_drawbox($boxes, $dims['w'], $dims['h'], $ffColor) : '';
+    $cropf = "crop={$p['crop_w']}:{$h}:{$p['crop_x']}:0";
+    $pre = $chain === '' ? $cropf : "{$chain},{$cropf}";
+    $rate = $fps ? ":r={$fps}" : '';
+    return "color=c={$canvasHex}:s={$p['target_w']}x{$h}{$rate}[bg];[0:v]{$pre}[fg];"
+         . "[bg][fg]overlay=x={$p['left']}:y=0:shortest=1[v]";
+}
+
+function vbf_render_widen(string $src, string $dst, array $boxes, string $ffColor,
+                         int $h, array $p, string $canvasHex): array {
+    $fps = vbf_probe_fps($src) ?: '25';
+    $fc = vbf_widen_fc($src, $boxes, $ffColor, $h, $p, $canvasHex, $fps);
     $argv = ['ffmpeg', '-hide_banner', '-loglevel', 'error', '-y', '-i', $src,
              '-filter_complex', $fc, '-map', '[v]', '-map', '0:a?',
              '-c:v', 'libx264', '-crf', '18', '-preset', 'veryfast',
@@ -110,12 +141,9 @@ function vbf_render_canvas(string $src, string $dst, array $boxes, string $ffCol
     return [true, ''];
 }
 
-// Single-frame variant (outputs one frame, e.g. a PNG).
-function vbf_render_canvas_frame(string $src, string $dst, array $boxes, string $ffColor,
-                                int $tw, int $th, array $crop, int $offx, int $offy,
-                                string $canvasHex, float $at = 0.0): array {
-    if (vbf_probe_dims($src) === null) return [false, "probe failed for $src"];
-    $fc = vbf_canvas_fc($src, $boxes, $ffColor, $tw, $th, $crop, $offx, $offy, $canvasHex, null);
+function vbf_render_widen_frame(string $src, string $dst, array $boxes, string $ffColor,
+                               int $h, array $p, string $canvasHex, float $at = 0.0): array {
+    $fc = vbf_widen_fc($src, $boxes, $ffColor, $h, $p, $canvasHex, null);
     $argv = ['ffmpeg', '-hide_banner', '-loglevel', 'error', '-y', '-ss', (string) $at, '-i', $src,
              '-filter_complex', $fc, '-map', '[v]', '-frames:v', '1', $dst];
     [$code, , $err] = vbf_exec($argv);
@@ -123,62 +151,24 @@ function vbf_render_canvas_frame(string $src, string $dst, array $boxes, string 
     return [true, ''];
 }
 
-// ---- Canonical canvas / normalization (shared by worker + preview) ----
-// Matches reference clip M20241209_9819 (1764x1534). Off-spec clips are border-cropped
-// (removes black auto-crop wedges) then composited with the person centred and the
-// eyes anchored VBF_TARGET_EYE_Y px from the top.
-const VBF_TARGET_W = 1764;
-const VBF_TARGET_H = 1534;
-const VBF_TARGET_HEAD_TOP = 200;   // desired margin between top of head and top of frame
-
-function vbf_needs_norm(array $dims): bool {
-    return $dims['w'] != VBF_TARGET_W || $dims['h'] != VBF_TARGET_H;
-}
-
-// Run lib/detect_center.py -> ['cx'=>float,'head_top'=>float,'crop'=>[x,y,w,h]] or null.
-// cx/head_top are in CROPPED coordinates.
-function vbf_detect_center(string $src): ?array {
-    [$code, $out] = vbf_exec(['python3', __DIR__ . '/detect_center.py', $src]);
-    if ($code !== 0) return null;
-    $i = json_decode(trim($out), true);
-    if (!is_array($i) || empty($i['ok']) || !isset($i['crop'])) return null;
-    return ['cx' => (float) $i['cx'], 'head_top' => (float) $i['head_top'], 'crop' => $i['crop']];
-}
-
-// Plan: crop rectangle + overlay offsets (centre person, anchor top-of-head). Falls
-// back to no-crop plain centring if detection fails.
-function vbf_norm_plan(string $src, array $dims): array {
-    $d = vbf_detect_center($src);
-    if ($d !== null) {
-        return ['crop' => $d['crop'],
-                'offx' => (int) round(VBF_TARGET_W / 2 - $d['cx']),
-                'offy' => (int) round(VBF_TARGET_HEAD_TOP - $d['head_top'])];
-    }
-    return ['crop' => ['x' => 0, 'y' => 0, 'w' => $dims['w'], 'h' => $dims['h']],
-            'offx' => (int) round((VBF_TARGET_W - $dims['w']) / 2),
-            'offy' => (int) round((VBF_TARGET_H - $dims['h']) / 2)];
-}
-
-// Unified video fix = mask + normalize-if-off-spec. Used by worker AND preview.
+// Unified video fix = mask + widen-to-1.15-if-needed. Used by worker AND preview.
 function vbf_process_video(string $src, string $dst, array $boxes, string $ffColor): array {
     $dims = vbf_probe_dims($src);
     if ($dims === null) return [false, "probe failed for $src"];
     if (vbf_needs_norm($dims)) {
-        $p = vbf_norm_plan($src, $dims);
-        return vbf_render_canvas($src, $dst, $boxes, $ffColor,
-                   VBF_TARGET_W, VBF_TARGET_H, $p['crop'], $p['offx'], $p['offy'], $ffColor);
+        $p = vbf_widen_plan($src, $dims);
+        return vbf_render_widen($src, $dst, $boxes, $ffColor, $dims['h'], $p, $ffColor);
     }
     return vbf_render($src, $dst, $boxes, $ffColor);
 }
 
-// Unified single-frame fix = mask + normalize-if-off-spec. Used by frame preview.
+// Unified single-frame fix = mask + widen-to-1.15-if-needed. Used by frame preview.
 function vbf_process_frame(string $src, string $dst, array $boxes, string $ffColor, float $at = 0.0): array {
     $dims = vbf_probe_dims($src);
     if ($dims === null) return [false, "probe failed for $src"];
     if (vbf_needs_norm($dims)) {
-        $p = vbf_norm_plan($src, $dims);
-        return vbf_render_canvas_frame($src, $dst, $boxes, $ffColor,
-                   VBF_TARGET_W, VBF_TARGET_H, $p['crop'], $p['offx'], $p['offy'], $ffColor, $at);
+        $p = vbf_widen_plan($src, $dims);
+        return vbf_render_widen_frame($src, $dst, $boxes, $ffColor, $dims['h'], $p, $ffColor, $at);
     }
     return vbf_render_frame($src, $dst, $boxes, $ffColor, $at);
 }
