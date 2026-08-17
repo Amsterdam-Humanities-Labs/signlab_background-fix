@@ -1,0 +1,191 @@
+{
+    "id": "20260526-073737-ac63",
+    "date": "20260526",
+    "color": "#316CA4",
+    "boxes": [
+        {
+            "x": 0,
+            "y": 0,
+            "w": 0.10772037631752306,
+            "h": 0.04839015151515152
+        }
+    ],
+    "created": "2026-06-06T07:37:37+00:00",
+    "items": [
+        {
+            "filename": "R20260526_6393.mp4",
+            "status": "done",
+            "error": null
+        },
+        {
+            "filename": "R20260526_6394.mp4",
+            "status": "done",
+            "error": null
+        },
+        {
+            "filename": "R20260526_6395.mp4",
+            "status": "done",
+            "error": null
+        },
+        {
+            "filename": "R20260526_6396.mp4",
+            "status": "done",
+            "error": null
+        },
+        {
+            "filename": "R20260526_6398.mp4",
+            "status": "error",
+            "error": "probe failed for \/web\/gebarenoverleg_media\/studioFilesMini\/post\/R20260526_6398.mp4"
+        },
+        {
+            "filename": "R20260526_6397.mp4",
+            "status": "done",
+            "error": null
+        },
+        {
+            "filename": "R20260526_6399.mp4",
+            "status": "done",
+            "error": null
+        },
+        {
+            "filename": "R20260526_6400.mp4",
+            "status": "done",
+            "error": null
+        },
+        {
+            "filename": "R20260526_6401.mp4",
+            "status": "done",
+            "error": null
+        },
+        {
+            "filename": "R20260526_6402.mp4",
+            "status": "done",
+            "error": null
+        },
+        {
+            "filename": "R20260526_6403.mp4",
+            "status": "done",
+            "error": null
+        },
+        {
+            "filename": "R20260526_6404.mp4",
+            "status": "done",
+            "error": null
+        },
+        {
+            "filename": "R20260526_6405.mp4",
+            "status": "done",
+            "error": null
+        },
+        {
+            "filename": "R20260526_6406.mp4",
+            "status": "done",
+            "error": null
+        },
+        {
+            "filename": "R20260526_6407.mp4",
+            "status": "done",
+            "error": null
+        },
+        {
+            "filename": "R20260526_6409.mp4",
+            "status": "done",
+            "error": null
+        },
+        {
+            "filename": "R20260526_6408.mp4",
+            "status": "done",
+            "error": null
+        },
+        {
+            "filename": "R20260526_6410.mp4",
+            "status": "done",
+            "error": null
+        },
+        {
+            "filename": "R20260526_6411.mp4",
+            "status": "done",
+            "error": null
+        },
+        {
+            "filename": "R20260526_6412.mp4",
+            "status": "done",
+            "error": null
+        },
+        {
+            "filename": "R20260526_6413.mp4",
+            "status": "done",
+            "error": null
+        },
+        {
+            "filename": "R20260526_6414.mp4",
+            "status": "done",
+            "error": null
+        },
+        {
+            "filename": "R20260526_6417.mp4",
+            "status": "done",
+            "error": null
+        },
+        {
+            "filename": "R20260526_6415.mp4",
+            "status": "done",
+            "error": null
+        },
+        {
+            "filename": "R20260526_6416.mp4",
+            "status": "done",
+            "error": null
+        },
+        {
+            "filename": "R20260526_6418.mp4",
+            "status": "done",
+            "error": null
+        },
+        {
+            "filename": "R20260526_6419.mp4",
+            "status": "done",
+            "error": null
+        },
+        {
+            "filename": "R20260526_6420.mp4",
+            "status": "done",
+            "error": null
+        },
+        {
+            "filename": "R20260526_6421.mp4",
+            "status": "done",
+            "error": null
+        },
+        {
+            "filename": "R20260526_6422.mp4",
+            "status": "done",
+            "error": null
+        },
+        {
+            "filename": "R20260526_6423.mp4",
+            "status": "done",
+            "error": null
+        },
+        {
+            "filename": "R20260526_6424.mp4",
+            "status": "done",
+            "error": null
+        },
+        {
+            "filename": "R20260526_6425.mp4",
+            "status": "done",
+            "error": null
+        },
+        {
+            "filename": "R20260526_6426.mp4",
+            "status": "done",
+            "error": null
+        },
+        {
+            "filename": "R20260526_6427.mp4",
+            "status": "done",
+            "error": null
+        }
+    ]
+}
