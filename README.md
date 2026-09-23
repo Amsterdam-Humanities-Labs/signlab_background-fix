@@ -6,7 +6,6 @@ A batch tool for one day of studio recordings. It masks unwanted background and 
 - `api/process.php` starts `worker.php <jobId>` with `setsid`. The render keeps running after the request ends and when php-fpm restarts.
 - `lib/ffmpeg.php` draws the masks with `drawbox`. If a video is more than 0.005 away from 1.15:1, it trims black borders and pads left and right with studio blue. `lib/detect_center.py` finds the signer to centre on; if that fails it uses the middle of the frame. There is no vertical crop and no scaling. Frame rate stays the same; video is libx264 CRF 18, audio is copied.
 - Before the first overwrite it copies the original `.mp4` and `.jpg` to `post_backup/`. The swap in `post/` is atomic. `api/restore.php` puts the original back. File names must match `/^[A-Z]\d{8}_\d+\.mp4$/`.
-- `docs/superpowers/` describes an older crop-and-scale design. The code is correct where they differ.
 
 ## Where it runs
 Core server only: `/web/videoBackgroundFix`, https://signcollect.nl/videoBackgroundFix/. It rewrites `/web/gebarenoverleg_media/studioFilesMini/post/` on local disk.
