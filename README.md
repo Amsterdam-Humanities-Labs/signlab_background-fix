@@ -20,8 +20,8 @@ There is no build step. It needs PHP 8, `ffmpeg` and `ffprobe`, `python3` with O
 The web user must be able to write to `jobs/` and `tmp/`.
 Tests must never touch production media, so every folder can be set by an environment variable:
 ```bash
-tests/make_fixture.sh   # once: makes a 1440x1252 clip of 1 second
-php tests/run.php
+php tests/run.php         # runs every tests/*_test.php; needs ffmpeg
+tests/make_fixture.sh     # optional: rebuilds the 1-second 1440x1252 clip in tests/fixtures/ (it is in git)
 ```
 
 ## Configuration
