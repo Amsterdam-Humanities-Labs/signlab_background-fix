@@ -1,9 +1,12 @@
 <?php
 // Path configuration and filename validation. Safe to include repeatedly; no side effects.
 // All directories are env-overridable so tests never touch production media.
+// Media directories default to the estate's install root (SC_WEB_ROOT via
+// signcollect-lib), not a literal /web (signlab_signcollect-stack#23).
+require_once __DIR__ . '/../sc_paths.php';
 
-function vbf_post_dir(): string   { return getenv('VBF_POST_DIR')   ?: '/web/gebarenoverleg_media/studioFilesMini/post'; }
-function vbf_backup_dir(): string { return getenv('VBF_BACKUP_DIR') ?: '/web/gebarenoverleg_media/studioFilesMini/post_backup'; }
+function vbf_post_dir(): string   { return getenv('VBF_POST_DIR')   ?: sc_path('gebarenoverleg_media/studioFilesMini/post'); }
+function vbf_backup_dir(): string { return getenv('VBF_BACKUP_DIR') ?: sc_path('gebarenoverleg_media/studioFilesMini/post_backup'); }
 function vbf_tmp_dir(): string    { return getenv('VBF_TMP_DIR')    ?: __DIR__ . '/../tmp'; }
 function vbf_jobs_dir(): string   { return getenv('VBF_JOBS_DIR')   ?: __DIR__ . '/../jobs'; }
 function vbf_api_base(): string   { return getenv('VBF_API_BASE')   ?: 'https://signcollect.nl/studioIndex/api.php'; }
