@@ -1,4 +1,4 @@
-# signlab_videoBackgroundFix
+# signlab_background-fix
 A batch tool for one day of studio recordings. It masks unwanted background and widens each video to 1.15:1 with the signer in the centre.
 
 ## What it does
@@ -33,7 +33,7 @@ No credentials and no database. `lib/paths.php` holds the defaults; environment 
 | `VBF_API_BASE` | `https://signcollect.nl/studioIndex/api.php` |
 
 ## Dependencies
-- [signlab_studioIndex](https://github.com/Amsterdam-Humanities-Labs/signlab_studioIndex) `api.php`: the list of dates (a request without a date returns 400 with `available_dates`) and the videos of a date (`?date=YYYYMMDD`).
+- [signlab_studio-archive](https://github.com/Amsterdam-Humanities-Labs/signlab_studio-archive) `api.php`: the list of dates (a request without a date returns 400 with `available_dates`) and the videos of a date (`?date=YYYYMMDD`).
 - Write access to `studioFilesMini/post/` and `post_backup/` on local disk.
 - There is no login and no `/userProtect.js`. Anyone who can reach the URL can overwrite studio media.
 - Deploy context: [signlab_signcollect-stack](https://github.com/Amsterdam-Humanities-Labs/signlab_signcollect-stack).
